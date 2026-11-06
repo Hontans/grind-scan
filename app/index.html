@@ -1206,7 +1206,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:27 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:31 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2638,55 +2638,59 @@ var Train = (function () {
     ['Abdos', /releve|crunch|gainage|abdo|planche/],
     ['Lombaires', /hyperextension|lombaire|superman/]
   ];
-  // Muscles qui travaillent aussi (comptés pour une demi-série).
-  var SECONDARY = [
-    [/tirage (vertical|haut)|traction|pulldown/, ['Grand rond', 'Biceps']],
-    [/pull ?over/, ['Grand rond', 'Triceps']],
-    [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal', 'Grand rond', 'Trapèzes', 'Biceps']],
-    [/oiseau|face ?pull/, ['Rhomboïdes', 'Trapèzes']],
-    [/developpe (incline|couche|decline)|pompes/, ['Triceps', 'Épaules']],
-    [/militaire|developpe (epaule|halteres assis)|arnold/, ['Triceps', 'Trapèzes']],
-    [/dips/, ['Pectoraux', 'Épaules']],
-    [/squat|presse|fente|hack/, ['Fessiers', 'Adducteurs']],
-    [/rdl|roumain|good morning/, ['Fessiers', 'Lombaires']],
-    [/hip thrust/, ['Ischios']],
-    [/hyperextension/, ['Fessiers', 'Ischios']]
+  // Exercices qui ciblent plusieurs groupes (tous principaux, une série compte pour chacun) :
+  // les tirages et rowings répartis sur les muscles du dos, les dips sur triceps et pectoraux.
+  // Pas de muscles « secondaires » : un développé ne compte pas pour les épaules ni les triceps.
+  var ALSO = [
+    [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal', 'Grand rond']],
+    [/tirage (vertical|haut)|traction|pulldown|pull ?over/, ['Grand rond']],
+    [/dips/, ['Pectoraux']]
   ];
   // Anciens noms de groupes (onglet EXERCISES) → noms actuels.
   var RENAMED = { Dos: 'Grand dorsal', Trapezes: 'Trapèzes', Rhomboides: 'Rhomboïdes' };
 
-  /** Groupe musculaire principal, deviné d'après le nom (corrigeable dans l'onglet EXERCISES). */
-  function muscleOf(name, exercises) {
+  /** Groupes d'un exercice d'après l'onglet EXERCISES (colonne muscle, plusieurs séparés par « , » ou « + »), sinon null. */
+  function declared(name, exercises) {
     var n = norm(name);
     var known = (exercises || []).filter(function (e) { return norm(e.name) === n && e.muscle; })[0];
-    if (known) return RENAMED[known.muscle] || known.muscle;
+    if (!known) return null;
+    return String(known.muscle).split(/\s*[,+\/]\s*/).filter(Boolean).map(function (m) { return RENAMED[m] || m; });
+  }
+
+  /** Groupe musculaire principal (le premier), deviné d'après le nom (corrigeable dans l'onglet EXERCISES). */
+  function muscleOf(name, exercises) {
+    var d = declared(name, exercises);
+    if (d && d.length) return d[0];
+    var n = norm(name);
     for (var i = 0; i < MUSCLES.length; i++) if (MUSCLES[i][1].test(n)) return MUSCLES[i][0];
     return 'Autre';
   }
 
-  /** Muscles secondaires (sans le principal). */
-  function secondaryOf(name, exercises) {
-    var n = norm(name), main = muscleOf(name, exercises), out = [];
-    SECONDARY.forEach(function (r) {
-      if (r[0].test(n)) r[1].forEach(function (m) { if (m !== main && out.indexOf(m) < 0) out.push(m); });
+  /** Tous les groupes ciblés par l'exercice, le principal en premier : ['Triceps', 'Pectoraux'] pour des dips. */
+  function musclesOf(name, exercises) {
+    var d = declared(name, exercises);
+    if (d && d.length) return d;
+    var main = muscleOf(name, exercises), n = norm(name), out = main === 'Autre' ? [] : [main];
+    ALSO.forEach(function (r) {
+      if (r[0].test(n)) r[1].forEach(function (m) { if (out.indexOf(m) < 0) out.push(m); });
     });
     return out;
   }
 
-  /** Séries effectives par muscle entre deux dates incluses (muscle principal : 1, secondaire : 0,5). */
+  /** Séries effectives par muscle entre deux dates incluses : une série compte pour chaque groupe ciblé. */
   function weeklyVolume(sets, from, to, exercises) {
     var out = {}, cache = {};
     (sets || []).forEach(function (s) {
       if (s.date < from || s.date > to || !isNum(s.reps) || s.reps <= 0) return;
-      var c = cache[s.exercise] || (cache[s.exercise] = { main: muscleOf(s.exercise, exercises), sec: secondaryOf(s.exercise, exercises) });
-      out[c.main] = (out[c.main] || 0) + 1;
-      c.sec.forEach(function (m) { out[m] = (out[m] || 0) + 0.5; });
+      var ms = cache[s.exercise] || (cache[s.exercise] = musclesOf(s.exercise, exercises));
+      if (!ms.length) ms = ['Autre'];
+      ms.forEach(function (m) { out[m] = (out[m] || 0) + 1; });
     });
     return out;
   }
 
   return { range: range, e1rm: e1rm, last: last, suggest: suggest, warmup: warmup, best: best, history: history, progress: progress, exercisesDone: exercisesDone,
-    muscleOf: muscleOf, secondaryOf: secondaryOf, weeklyVolume: weeklyVolume, norm: norm };
+    muscleOf: muscleOf, musclesOf: musclesOf, weeklyVolume: weeklyVolume, norm: norm };
 })();
 </script>
 
@@ -3331,7 +3335,7 @@ Views.train = (function () {
     var prog = programFor(name);
     var nSets = prog.reduce(function (t, p) { return t + (Number(p.sets) || 3); }, 0);
     var muscles = [];
-    prog.forEach(function (p) { var m = Train.muscleOf(p.exercise, Store.list('EXERCISES')); if (muscles.indexOf(m) < 0 && m !== 'Autre') muscles.push(m); });
+    prog.forEach(function (p) { Train.musclesOf(p.exercise, Store.list('EXERCISES')).forEach(function (m) { if (muscles.indexOf(m) < 0) muscles.push(m); }); });
     var last = Store.list('SESSIONS').filter(function (s) { return s.name === name && s.date < U.today(); }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
     return '<section class="card start-card">' +
       '<div class="pick-row">' + sessionNames().map(function (n) {
@@ -3406,12 +3410,12 @@ Views.train = (function () {
         '<span class="field-box"><input inputmode="decimal" data-load placeholder="' + (phLoad == null ? 'kg' : String(phLoad).replace('.', ',')) + '" value="' + (saved && saved.load != null ? String(saved.load).replace('.', ',') : '') + '"><span class="unit">kg</span></span>' +
         '<button class="check" data-check="' + idx + '-' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
     }
-    var muscle = Train.muscleOf(p.exercise, Store.list('EXERCISES')), second = Train.secondaryOf(p.exercise, Store.list('EXERCISES'));
+    var targets = Train.musclesOf(p.exercise, Store.list('EXERCISES')), muscle = targets.join(' + ') || 'Autre';
     var vids = Videos.of(p.exercise).length;
     return '<section class="card ex-card">' +
-      '<div class="ex-head"><div class="ex-fig" title="' + U.esc([muscle].concat(second).join(', ')) + '">' + Body.mini([muscle], second) + '</div>' +
+      '<div class="ex-head"><div class="ex-fig" title="' + U.esc(muscle) + '">' + Body.mini(targets) + '</div>' +
       '<div class="ex-head-text"><button class="ex-title" data-ex="' + U.esc(p.exercise) + '"><h2>' + U.esc(p.exercise) + '</h2></button>' +
-      '<div class="ex-meta"><span class="chip">' + U.esc((p.sets || '?') + ' × ' + (p.reps || '?')) + (p.rest ? ' · ' + U.esc(p.rest) : '') + '</span><span class="muted small">' + U.esc(muscle) + (second.length ? ' + ' + U.esc(second.join(', ')) : '') + '</span></div>' +
+      '<div class="ex-meta"><span class="chip">' + U.esc((p.sets || '?') + ' × ' + (p.reps || '?')) + (p.rest ? ' · ' + U.esc(p.rest) : '') + '</span><span class="muted small">' + U.esc(muscle) + '</span></div>' +
       '<button class="ex-video" data-video="' + U.esc(p.exercise) + '">' + App.icon('video', 'sm') + (vids ? 'Mes vidéos (' + vids + ')' : 'Ajouter une vidéo') + '</button></div></div>' +
       (p.cue ? '<details class="cue"><summary>Consignes</summary><p>' + U.esc(p.cue) + '</p>' + (p.links ? String(p.links).split(' ').map(function (l) { return '<a href="' + U.esc(l) + '" target="_blank" rel="noopener">Vidéo</a>'; }).join(' ') : '') + '</details>' : '') +
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + prev.sets.map(fmtSet).join(' · ') + '</p>' : '<p class="muted small">Première fois sur cet exercice.</p>') +
@@ -4512,7 +4516,7 @@ var BodyPaths = {"front":{"vb":"0 95 727 1280","inert":["M 418.91 167.68 c 3.92 
  * miniature qui montre les muscles travaillés par un exercice.
  *
  * Dessin : BodyPaths (tracés de MuscleMap, MIT, un muscle = une forme par côté, généré par tools/body-paths.py).
- * Chaque forme porte son groupe, celui de Train.muscleOf / Train.secondaryOf ; tête, cou, mains, genoux et pieds
+ * Chaque forme porte son groupe, celui de Train.musclesOf ; tête, cou, mains, genoux et pieds
  * restent gris.
  */
 var Body = (function () {
@@ -4548,16 +4552,15 @@ var Body = (function () {
       '<div class="body-legend"><span>0</span><i class="bm-0"></i><i class="bm-1"></i><i class="bm-2"></i><i class="bm-3"></i><i class="bm-4"></i><span>15+ séries</span></div>';
   }
 
-  /** Petit mannequin (face ou dos, selon où se voit le muscle principal) : principaux allumés, secondaires en plus clair. */
-  function mini(muscles, secondary) {
+  /** Petit mannequin (face ou dos, selon où se voient les muscles) avec les groupes donnés allumés. */
+  function mini(muscles) {
     var keep = function (m) { return m && m !== 'Autre'; };
     muscles = (muscles || []).filter(keep);
-    secondary = (secondary || []).filter(keep);
     var back = muscles.filter(function (m) { return BACK_ONLY.indexOf(m) >= 0; }).length;
     var front = muscles.length - back;
-    var useBack = back > front || (back === front && back > 0);
-    var lv = function (g) { return { l: muscles.indexOf(g) >= 0 ? 4 : secondary.indexOf(g) >= 0 ? 2 : 0, t: '' }; };
-    return figure(useBack ? 'back' : 'front', lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.concat(secondary).join(', '), 'mini');
+    var useBack = back > front;
+    var lv = function (g) { return { l: muscles.indexOf(g) >= 0 ? 4 : 0, t: '' }; };
+    return figure(useBack ? 'back' : 'front', lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.join(', '), 'mini');
   }
 
   return { svg: svg, mini: mini, level: level };
@@ -5323,7 +5326,7 @@ Views.trends = (function () {
   /** Feuille d'un muscle : séries de la semaine par exercice, puis les exercices du programme qui le font travailler. */
   function openMuscle(app, muscle) {
     var to = U.today(), from = U.addDays(to, -6), exs = Store.list('EXERCISES');
-    var role = function (name) { return Train.muscleOf(name, exs) === muscle ? 1 : Train.secondaryOf(name, exs).indexOf(muscle) >= 0 ? 0.5 : 0; };
+    var role = function (name) { return Train.musclesOf(name, exs).indexOf(muscle) >= 0 ? 1 : 0; };
     var week = {}, total = 0;
     Store.list('SETS').forEach(function (st) {
       if (st.date < from || st.date > to || typeof st.reps !== 'number' || st.reps <= 0) return;
@@ -5339,20 +5342,19 @@ Views.trends = (function () {
       var e = prog[p.exercise] = prog[p.exercise] || { name: p.exercise, r: r, sessions: [] };
       if (e.sessions.indexOf(p.session) < 0) e.sessions.push(p.session);
     });
-    var tag = function (r) { return '<span class="chip' + (r === 1 ? ' accent' : '') + '">' + (r === 1 ? 'principal' : 'secondaire') + '</span>'; };
+    var also = function (name) { var o = Train.musclesOf(name, exs).filter(function (m) { return m !== muscle; }); return o.length ? ' · aussi ' + U.esc(o.join(', ')) : ''; };
     var byCredit = function (a, b) { return b.r - a.r || (b.credit || 0) - (a.credit || 0); };
     var wk = Object.keys(week).map(function (k) { return week[k]; }).sort(byCredit);
     var pg = Object.keys(prog).map(function (k) { return prog[k]; }).sort(byCredit);
     app.openSheet({
       title: muscle,
       html: Body.mini([muscle]).replace('class="body-fig mini"', 'class="body-fig mini muscle-fig"') +
-        '<p class="muted small center">' + U.nf(total) + ' série' + (total > 1 ? 's' : '') + ' comptée' + (total > 1 ? 's' : '') + ' ces 7 derniers jours (un muscle secondaire compte pour une demi-série).</p>' +
+        '<p class="muted small center">' + U.nf(total) + ' série' + (total > 1 ? 's' : '') + ' comptée' + (total > 1 ? 's' : '') + ' ces 7 derniers jours.</p>' +
         '<h3 class="sheet-h">Cette semaine</h3>' + (wk.length ? '<ul class="list">' + wk.map(function (w) {
-          return '<li class="hist-row"><span class="entry-name">' + U.esc(w.name) + '</span><span class="muted small">' + w.sets + ' série' + (w.sets > 1 ? 's' : '') +
-            (w.r < 1 ? ' → ' + U.nf(w.credit) + ' comptée' + (w.credit > 1 ? 's' : '') : '') + ' ' + tag(w.r) + '</span></li>';
+          return '<li class="hist-row"><span class="entry-name">' + U.esc(w.name) + '</span><span class="muted small">' + w.sets + ' série' + (w.sets > 1 ? 's' : '') + also(w.name) + '</span></li>';
         }).join('') + '</ul>' : '<p class="muted">Aucune série sur ce muscle ces 7 derniers jours.</p>') +
         '<h3 class="sheet-h">Dans ton programme</h3>' + (pg.length ? '<ul class="list">' + pg.map(function (e) {
-          return '<li class="hist-row"><span class="entry-name">' + U.esc(e.name) + '</span><span class="muted small">' + e.sessions.map(U.esc).join(', ') + ' ' + tag(e.r) + '</span></li>';
+          return '<li class="hist-row"><span class="entry-name">' + U.esc(e.name) + '</span><span class="muted small">' + e.sessions.map(U.esc).join(', ') + also(e.name) + '</span></li>';
         }).join('') + '</ul>' : '<p class="muted">Aucun exercice du programme ne travaille ce muscle.</p>')
     });
   }
