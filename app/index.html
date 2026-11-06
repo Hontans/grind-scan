@@ -1129,7 +1129,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 17:36 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 19:29 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2866,11 +2866,6 @@ var Store = (function () {
 var Views = window.Views || {};
 
 Views.today = (function () {
-  var DEFAULT_HABITS = ['Créatine', '2 L d\'eau', 'Compléments', 'Étirements'];
-  function habitList() {
-    try { var h = JSON.parse(Store.list('SETTINGS').habits || 'null'); if (h && h.length) return h; } catch (e) { /* réglage illisible */ }
-    return DEFAULT_HABITS;
-  }
 
   function dayRecord(date) {
     return Store.get('DAILY', date) || { id: date, date: date };
@@ -2965,14 +2960,7 @@ Views.today = (function () {
       '<label class="field"><span class="field-label">Note du jour</span>' +
       '<textarea data-field="note" rows="3" placeholder="Séance, digestion, ressenti…">' + U.esc(day.note || '') + '</textarea></label>' +
       '</section>';
-    var habits = habitList();
-    var done = (day.habits ? String(day.habits).split('|') : []);
-    var habitCard = '<section class="card"><div class="card-head"><h2>Habitudes</h2><button class="link" data-edit-habits>Modifier</button></div><div class="habits">' +
-      habits.map(function (h) {
-        var on = done.indexOf(h) >= 0;
-        return '<button class="habit' + (on ? ' on' : '') + '" data-habit="' + U.esc(h) + '" aria-pressed="' + on + '"><span class="tick">' + (on ? App.icon('check') : '') + '</span>' + U.esc(h) + '</button>';
-      }).join('') + '</div></section>';
-    return '<div id="today-summary">' + summaryHtml(date) + '</div>' + sessionCard(date) + morning + habitCard + evening;
+    return '<div id="today-summary">' + summaryHtml(date) + '</div>' + sessionCard(date) + morning + evening;
   }
 
   function header(state) {
@@ -2983,34 +2971,6 @@ Views.today = (function () {
     root.addEventListener('click', function (e) {
       var go = e.target.closest('[data-go]');
       if (go) { app.go(go.getAttribute('data-go')); return; }
-      var hb = e.target.closest('[data-habit]');
-      if (hb) {
-        var h = hb.getAttribute('data-habit');
-        var list = (dayRecord(state.date).habits ? String(dayRecord(state.date).habits).split('|') : []);
-        var i = list.indexOf(h);
-        if (i >= 0) list.splice(i, 1); else list.push(h);
-        save(state.date, { habits: list.join('|') || null });
-        hb.classList.toggle('on', i < 0);
-        hb.setAttribute('aria-pressed', i < 0);
-        hb.querySelector('.tick').innerHTML = i < 0 ? app.icon('check') : '';
-        app.haptic();
-        return;
-      }
-      if (e.target.closest('[data-edit-habits]')) {
-        app.openSheet({
-          title: 'Habitudes suivies',
-          html: '<p class="muted small">Une par ligne.</p><textarea class="input" rows="6" data-habits-text>' + U.esc(habitList().join('\n')) + '</textarea>' +
-            '<button class="btn primary block" data-save-habits>Enregistrer</button>',
-          bind: function (p) {
-            p.querySelector('[data-save-habits]').addEventListener('click', function () {
-              var lines = p.querySelector('[data-habits-text]').value.split('\n').map(function (x) { return x.trim().replace(/\|/g, '/'); }).filter(Boolean);
-              Store.put('SETTINGS', { key: 'habits', value: JSON.stringify(lines) });
-              app.closeSheet(); app.render();
-            });
-          }
-        });
-        return;
-      }
       var b = e.target.closest('[data-rate]');
       if (!b) return;
       var key = b.getAttribute('data-rate'), v = Number(b.getAttribute('data-v'));
