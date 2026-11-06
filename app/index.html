@@ -1025,8 +1025,8 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .ex-head-text { flex: 1; min-width: 0; display: grid; gap: 6px; justify-items: start; }
 .ex-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ex-video {
-  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 9px; border-radius: 999px;
-  background: var(--accent-soft); color: var(--accent-ink); font: 600 12.5px var(--font);
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px 0 11px; border-radius: 999px;
+  background: var(--accent-grad); color: var(--on-accent); box-shadow: var(--accent-shadow); font: 600 13px var(--font);
   transition: transform .9s var(--liquid);
 }
 .ex-video:active { transform: scale(1.05, .9); transition: transform .14s var(--ease-out); }
@@ -1182,7 +1182,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 20:36 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 21:14 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3351,7 +3351,6 @@ Views.train = (function () {
         '<span class="field-box"><input inputmode="decimal" data-load placeholder="' + (phLoad == null ? 'kg' : String(phLoad).replace('.', ',')) + '" value="' + (saved && saved.load != null ? String(saved.load).replace('.', ',') : '') + '"><span class="unit">kg</span></span>' +
         '<button class="check" data-check="' + idx + '-' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
     }
-    var warm = Train.warmup(sug ? sug.load : (prev && prev.sets[0] && prev.sets[0].load));
     var muscle = Train.muscleOf(p.exercise, Store.list('EXERCISES'));
     var vids = Videos.of(p.exercise).length;
     return '<section class="card ex-card">' +
@@ -3362,7 +3361,6 @@ Views.train = (function () {
       (p.cue ? '<details class="cue"><summary>Consignes</summary><p>' + U.esc(p.cue) + '</p>' + (p.links ? String(p.links).split(' ').map(function (l) { return '<a href="' + U.esc(l) + '" target="_blank" rel="noopener">Vidéo</a>'; }).join(' ') : '') + '</details>' : '') +
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + prev.sets.map(fmtSet).join(' · ') + '</p>' : '<p class="muted small">Première fois sur cet exercice.</p>') +
       (sug ? '<p class="tip">' + U.esc(sug.text) + '</p>' : '') +
-      (warm.length && !savedSet(w, p.exercise, 1) ? '<p class="muted small">Échauffement : ' + warm.map(function (x) { return x.reps + ' × ' + U.nf(x.load) + ' kg'; }).join(' · ') + '</p>' : '') +
       '<div class="sets">' + rows + '</div>' +
       '<button class="btn ghost" data-more="' + idx + '">+ Série</button>' +
       '</section>';
