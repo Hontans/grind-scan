@@ -1129,6 +1129,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
+<script>window.GRIND_BUILD = "2026-11-06 17:36 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5568,7 +5569,8 @@ window.Views = Views;
         var sw = t.a === t.b ? 'radial-gradient(circle at 30% 25%, ' + t.c + ', ' + t.a + ' 70%)' : 'linear-gradient(135deg, ' + t.a + ', ' + t.b + ')';
         return '<button class="swatch" data-theme-id="' + t.id + '" aria-pressed="' + (look.theme === t.id) + '"><i style="--sw:' + sw + '"></i>' + U.esc(t.name) + '</button>';
       }).join('') + '</div>' +
-      '<p class="muted small" style="margin-top:18px">Le fond et le verre prennent les couleurs du thème. Réglage gardé sur ce téléphone.</p>';
+      '<p class="muted small" style="margin-top:18px">Le fond et le verre prennent les couleurs du thème. Réglage gardé sur ce téléphone.</p>' +
+      (window.GRIND_BUILD ? '<p class="muted small">Version ' + U.esc(window.GRIND_BUILD) + '</p>' : '');
   }
   function openSettings() {
     openSheet({
