@@ -1174,7 +1174,7 @@ table.data tbody tr { cursor: pointer; }
     fetch(cfg.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: cfg.key, fn: fn, args: args }) })
       .then(function (r) { return r.json(); })
       .then(function (res) { if (res && res.ok) { if (ok) ok(res.result); } else fail(res && res.error || 'Erreur du serveur', res && res.auth); })
-      .catch(function () { fail('Pas de réseau'); });
+      .catch(function () { fail(navigator.onLine === false ? 'pas de réseau' : 'le script ne répond pas (déploiement : Moi / Tout le monde, nouvelle version ; lance testerApp dans l\'éditeur)'); });
   }
 
   var FNS = ['api_boot', 'api_sync', 'api_foodByBarcode', 'api_foodSearch', 'api_photoSave', 'api_photoGet', 'api_photoDelete'];
