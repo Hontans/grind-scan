@@ -1206,7 +1206,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:40 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:42 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2658,7 +2658,8 @@ var Train = (function () {
     var n = norm(name);
     var known = (exercises || []).filter(function (e) { return norm(e.name) === n && e.muscle; })[0];
     if (!known) return null;
-    return String(known.muscle).split(/\s*[,+\/]\s*/).filter(Boolean).map(function (m) { return RENAMED[m] || m; });
+    return String(known.muscle).split(/\s*[,+\/]\s*/).filter(Boolean).map(function (m) { return RENAMED[m] || m; })
+      .filter(function (m, i, a) { return a.indexOf(m) === i; });
   }
 
   /** Groupe musculaire principal (le premier), deviné d'après le nom (corrigeable dans l'onglet EXERCISES). */
