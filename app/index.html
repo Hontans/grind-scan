@@ -218,15 +218,18 @@ body {
 /* page agrandie à la taille de l'écran (voir fitViewport) : le body sert de repère aux éléments fixés */
 html.vfix, html.vfix body { height: var(--app-h); }
 html.vfix body { transform: translateZ(0); }
-/* paysage sur téléphone : écran qui demande de remettre le téléphone droit */
-.rotate-lock { display: none; }
+/* paysage sur téléphone : écran qui demande de remettre le téléphone droit (classe posée par App, et media query
+   pour l'instant où le téléphone tourne) */
+.rotate-lock {
+  display: none; place-items: center; position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg); color: var(--text); text-align: center; font: 500 16px/1.4 var(--font);
+}
+.rotate-lock p { margin: 14px 0 0; color: var(--text-2); }
+html.landscape-lock .rotate-lock { display: grid; }
+html.landscape-lock #app, html.landscape-lock #lq { visibility: hidden; }
 @media (orientation: landscape) and (max-height: 500px) and (hover: none) {
-  .rotate-lock {
-    display: grid; place-items: center; position: fixed; inset: 0; z-index: 1000;
-    background: var(--bg); color: var(--text); text-align: center; font: 500 16px/1.4 var(--font);
-  }
-  .rotate-lock p { margin: 14px 0 0; color: var(--text-2); }
-  #app { visibility: hidden; }
+  .rotate-lock { display: grid; }
+  #app, #lq { visibility: hidden; }
 }
 #scroll {
   position: fixed; left: 0; top: 0; right: 0; bottom: 0;
@@ -253,6 +256,14 @@ html.vfix body { transform: translateZ(0); }
 #veil-t {
   top: 0; height: calc(var(--sat) + 58px);
   background: linear-gradient(to bottom, var(--veil) 30%, transparent);
+}
+/* là où c'est possible, le contenu s'efface tout seul avant la barre d'état : le fond passe dessous, sans bande */
+@supports ((-webkit-mask-image: linear-gradient(#000, #000)) or (mask-image: linear-gradient(#000, #000))) {
+  #scroll {
+    -webkit-mask-image: linear-gradient(to bottom, transparent calc(var(--sat) + 2px), #000 calc(var(--sat) + 50px));
+    mask-image: linear-gradient(to bottom, transparent calc(var(--sat) + 2px), #000 calc(var(--sat) + 50px));
+  }
+  #veil-t { display: none; }
 }
 #veil-b {
   bottom: 0; height: calc(var(--nav-h) + var(--nav-b) + 26px);
@@ -670,7 +681,7 @@ html:not(.gl) .backdrop { z-index: 33; }
 .sheet {
   position: fixed; left: 8px; right: 8px; bottom: max(8px, calc(var(--sab) - 16px)); z-index: 34;
   /* sous l'en-tête avec assez d'écart pour que leurs verres ne fusionnent pas */
-  max-height: calc(var(--app-h, 100vh) - var(--sat) - 10px - var(--head-h) - var(--glass-gap) - 12px - max(8px, calc(var(--sab) - 16px))); overflow-y: auto; overscroll-behavior: none;
+  max-height: calc(var(--cb-h, 100vh) - var(--sat) - 10px - var(--head-h) - var(--glass-gap) - 12px - max(8px, calc(var(--sab) - 16px))); overflow-y: auto; overscroll-behavior: none;
   margin: 0 auto; max-width: 544px;
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -1220,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 23:09 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 23:24 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2060,6 +2071,8 @@ window.Liquid = (function () {
 
     if (needMeasure || now < trackUntil) {
       needMeasure = false;
+      // l'écran a changé de taille sans que resize l'ait vu (rotation sur iPhone) : on recadre
+      if (Math.abs(canvas.clientWidth - cw) > 1 || Math.abs(canvas.clientHeight - ch) > 1) resize();
       shapes.forEach(function (s) { if (!s.removing) setTargetsFromEl(s); });
       lensTargets();
     }
@@ -2205,6 +2218,10 @@ window.Liquid = (function () {
   // ---------------------------------------------------------------- événements
 
   window.addEventListener('resize', function () { resize(); needMeasure = true; wake(); });
+  // Rotation : l'iPhone donne la nouvelle taille un peu après l'événement.
+  window.addEventListener('orientationchange', function () {
+    [120, 450, 1000].forEach(function (t) { setTimeout(function () { resize(); needMeasure = true; wake(); }, t); });
+  });
   // Retour dans l'app : on redessine, au cas où le système aurait vidé l'image affichée.
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { needMeasure = true; wake(); } });
   window.addEventListener('pageshow', function () { needMeasure = true; wake(); });
@@ -6079,7 +6096,8 @@ window.Views = Views;
         return '<button class="swatch" data-theme-id="' + t.id + '" aria-pressed="' + (look.theme === t.id) + '"><i style="--sw:' + sw + '"></i>' + U.esc(t.name) + '</button>';
       }).join('') + '</div>' +
       '<p class="muted small" style="margin-top:18px">Le fond et le verre prennent les couleurs du thème. Réglage gardé sur ce téléphone.</p>' +
-      (window.GRIND_BUILD ? '<p class="muted small">Version ' + U.esc(window.GRIND_BUILD) + '</p>' : '');
+      (window.GRIND_BUILD ? '<p class="muted small">Version ' + U.esc(window.GRIND_BUILD) + '</p>' : '') +
+      (window.GRIND_VP ? '<p class="muted small">Affichage : ' + U.esc(window.GRIND_VP) + '</p>' : '');
   }
   function openSettings() {
     openSheet({
@@ -6166,31 +6184,52 @@ window.Views = Views;
     }
     e.preventDefault();
   }, { passive: false });
-  // Taille réelle de l'écran utilisable (--app-h) et marge de la barre d'état (--sat).
+  // Taille réelle de l'écran utilisable et marge de la barre d'état (--sat).
   // Icône d'accueil, barre d'état transparente : l'app doit couvrir tout l'écran, barre d'état comprise.
-  // Certains iPhone donnent pourtant à la page la hauteur de l'écran moins la barre d'état (bande vide en bas) :
-  // on agrandit alors la page à la taille de l'écran (html.vfix), et le body devient le repère des éléments fixés.
+  // Certains iPhone donnent pourtant aux éléments fixés la hauteur de l'écran moins la barre d'état (bande vide
+  // en bas, verres décalés) : on agrandit alors la page à la taille de l'écran (html.vfix), et le body devient
+  // le repère des éléments fixés. --cb-h = hauteur mesurée de ce repère (sert aux feuilles).
   // Le cadre de Google, lui, ne reçoit pas toujours la marge de la barre d'état (env(safe-area-inset-top) à 0).
+  function fixedBox(css) {
+    var probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;left:0;width:1px;visibility:hidden;pointer-events:none;' + css;
+    document.body.appendChild(probe);
+    var h = probe.getBoundingClientRect().height;
+    probe.parentNode.removeChild(probe);
+    return h;
+  }
   function fitViewport() {
     var root = document.documentElement, st = root.style;
-    var probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none';
-    document.body.appendChild(probe);
-    var env = probe.getBoundingClientRect().height;
-    probe.parentNode.removeChild(probe);
-    var sh = window.screen && screen.height || 0, ih = window.innerHeight, portrait = ih > window.innerWidth;
-    var phone = window.innerWidth < 600 && portrait && sh > 0;
-    var short = phone && window.navigator.standalone === true && sh - ih >= 20 && sh - ih <= 70;
+    root.classList.remove('vfix');
+    var env = fixedBox('top:0;height:env(safe-area-inset-top,0px)');
+    var cb = fixedBox('top:0;bottom:0');
+    var sh = window.screen && screen.height || 0, ih = window.innerHeight, iw = window.innerWidth;
+    var touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    var landscape = touch && iw > ih && ih < 500;
+    root.classList.toggle('landscape-lock', landscape);
+    var phone = iw < 600 && ih > iw && sh > 0;
+    var standalone = window.navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    var view = Math.min(ih, cb || ih), gap = sh - view;
+    var short = phone && standalone && gap >= 20 && gap <= 70;
     root.classList.toggle('vfix', short);
-    st.setProperty('--app-h', (short ? sh : ih) + 'px');
-    var full = short || (phone && ih >= sh - 1);
+    st.setProperty('--app-h', (short ? sh : view) + 'px');
+    var full = short || (phone && view >= sh - 1);
     if (env > 0 || !full) st.removeProperty('--sat');
-    else st.setProperty('--sat', (short ? sh - ih : sh >= 852 ? 59 : 47) + 'px');
+    else st.setProperty('--sat', (short ? gap : sh >= 852 ? 59 : 47) + 'px');
+    var box = fixedBox('top:0;bottom:0');
+    st.setProperty('--cb-h', Math.round(box) + 'px');
+    window.GRIND_VP = 'écran ' + sh + ' · fenêtre ' + ih + ' · repère ' + Math.round(cb) + ' → ' + Math.round(box) +
+      ' · barre ' + Math.round(env) + (short ? ' · ajusté' : '') + (standalone ? ' · icône' : '');
   }
   fitViewport();
   window.addEventListener('resize', fitViewport);
-  window.addEventListener('orientationchange', function () { setTimeout(fitViewport, 300); });
-  // Pas de mode paysage : bloqué là où le navigateur le permet (Android), sinon un écran demande de tourner le téléphone.
+  // La page elle-même ne défile jamais (seul #scroll défile) : sinon le verre se décale de ses éléments.
+  // Sauf pendant la saisie, où l'iPhone remonte la page au-dessus du clavier.
+  window.addEventListener('scroll', function () {
+    var a = document.activeElement;
+    if ((window.scrollY || window.scrollX) && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) window.scrollTo(0, 0);
+  }, { passive: true });
+  window.addEventListener('orientationchange', function () { [100, 400, 900].forEach(function (t) { setTimeout(fitViewport, t); }); });
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function () {}); } catch (e) { /* non pris en charge */ }
   (function () {
     var rot = document.createElement('div');
