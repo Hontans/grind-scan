@@ -1042,7 +1042,8 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .vid-ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); flex: none; }
 .vid-ico .icon { width: 15px; height: 15px; }
 
-.ex-card > .btn.ghost { width: 100%; height: 40px; font-size: 13.5px; }
+.set-actions { display: flex; gap: 8px; }
+.set-actions .btn.ghost { flex: 1; height: 40px; font-size: 13.5px; }
 
 /* habitudes */
 .habits { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1116,6 +1117,28 @@ table.data tbody tr { cursor: pointer; }
 
 /* ---------------------------------------------------------------- Suivi : courbes, mannequin, photos */
 .chart .area { fill: var(--accent-soft); opacity: .7; }
+.data-seg { margin-bottom: 12px; }
+.wk { padding: 12px 0; border-top: 1px solid var(--line); }
+.wk:first-of-type { border-top: 0; }
+.wk-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.wk-head b { font-size: 15px; }
+.wk > .muted.small { margin: 2px 0 6px; }
+.wk-ex { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.wk-ex li { display: grid; gap: 1px; font-size: 13.5px; }
+.chart-box { position: relative; }
+.tip-chart { touch-action: pan-y; cursor: crosshair; -webkit-user-select: none; user-select: none; }
+.tip-chart:not(.tipping) .tip-guide, .tip-chart:not(.tipping) .tip-ring { display: none; }
+.chart .tip-guide { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .tip-ring { fill: none; stroke: var(--accent-ink); stroke-width: 2; pointer-events: none; }
+.chart .peak { fill: var(--accent-ink); font: 600 10.5px var(--font); font-variant-numeric: tabular-nums; }
+.chart-tip {
+  position: absolute; z-index: 3; pointer-events: none; max-width: 240px; padding: 7px 10px; border-radius: 12px;
+  background: var(--solid); color: var(--text); box-shadow: 0 8px 22px -8px rgba(0, 0, 0, .45), inset 0 0 0 .75px var(--line-2);
+  font: 500 12px/1.4 var(--font); font-variant-numeric: tabular-nums; display: grid; gap: 1px; animation: fadein .15s var(--ease-out);
+}
+.chart-tip[hidden] { display: none; }
+.chart-tip b { font-weight: 650; }
+.chart-tip span { color: var(--text-2); }
 .chart .dot-best { fill: var(--accent-2, var(--accent)); stroke: var(--solid); stroke-width: 1.5; filter: drop-shadow(0 0 5px var(--accent-glow)); }
 .input.picker { padding-right: 38px; font-weight: 600; text-overflow: ellipsis;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23999' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -1182,7 +1205,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 21:14 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 21:58 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2596,9 +2619,12 @@ var Train = (function () {
       .sort(function (a, b) { return a.last === b.last ? b.sessions - a.sessions : (a.last < b.last ? 1 : -1); });
   }
 
+  // Muscle principal d'après le nom (le premier qui correspond l'emporte).
   var MUSCLES = [
     ['Pectoraux', /developpe (incline|couche|decline)|ecarte|pec ?deck|pompes|dips pec|chest/],
-    ['Dos', /tirage|rowing|traction|pull ?over|pulldown|row\b/],
+    ['Trapèzes', /shrug|haussement|trapeze/],
+    ['Rhomboïdes', /rowing|row\b|tirage horizontal|tirage poitrine/],
+    ['Grand dorsal', /tirage|traction|pull ?over|pulldown|lat\b/],
     ['Épaules', /elevation|militaire|developpe (epaule|halteres assis)|oiseau|face ?pull|arnold|shoulder/],
     ['Avant-bras', /poignet|avant.?bras|forearm|wrist/],
     ['Biceps', /curl(?! jambe| ischio| allonge| assis)|biceps/],
@@ -2611,29 +2637,55 @@ var Train = (function () {
     ['Abdos', /releve|crunch|gainage|abdo|planche/],
     ['Lombaires', /hyperextension|lombaire|superman/]
   ];
+  // Muscles qui travaillent aussi (comptés pour une demi-série).
+  var SECONDARY = [
+    [/tirage (vertical|haut)|traction|pulldown/, ['Grand rond', 'Biceps']],
+    [/pull ?over/, ['Grand rond', 'Triceps']],
+    [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal', 'Grand rond', 'Trapèzes', 'Biceps']],
+    [/oiseau|face ?pull/, ['Rhomboïdes', 'Trapèzes']],
+    [/developpe (incline|couche|decline)|pompes/, ['Triceps', 'Épaules']],
+    [/militaire|developpe (epaule|halteres assis)|arnold/, ['Triceps', 'Trapèzes']],
+    [/dips/, ['Pectoraux', 'Épaules']],
+    [/squat|presse|fente|hack/, ['Fessiers', 'Adducteurs']],
+    [/rdl|roumain|good morning/, ['Fessiers', 'Lombaires']],
+    [/hip thrust/, ['Ischios']],
+    [/hyperextension/, ['Fessiers', 'Ischios']]
+  ];
+  // Anciens noms de groupes (onglet EXERCISES) → noms actuels.
+  var RENAMED = { Dos: 'Grand dorsal', Trapezes: 'Trapèzes', Rhomboides: 'Rhomboïdes' };
 
   /** Groupe musculaire principal, deviné d'après le nom (corrigeable dans l'onglet EXERCISES). */
   function muscleOf(name, exercises) {
     var n = norm(name);
     var known = (exercises || []).filter(function (e) { return norm(e.name) === n && e.muscle; })[0];
-    if (known) return known.muscle;
+    if (known) return RENAMED[known.muscle] || known.muscle;
     for (var i = 0; i < MUSCLES.length; i++) if (MUSCLES[i][1].test(n)) return MUSCLES[i][0];
     return 'Autre';
   }
 
-  /** Séries effectives par muscle entre deux dates incluses. */
+  /** Muscles secondaires (sans le principal). */
+  function secondaryOf(name, exercises) {
+    var n = norm(name), main = muscleOf(name, exercises), out = [];
+    SECONDARY.forEach(function (r) {
+      if (r[0].test(n)) r[1].forEach(function (m) { if (m !== main && out.indexOf(m) < 0) out.push(m); });
+    });
+    return out;
+  }
+
+  /** Séries effectives par muscle entre deux dates incluses (muscle principal : 1, secondaire : 0,5). */
   function weeklyVolume(sets, from, to, exercises) {
-    var out = {};
+    var out = {}, cache = {};
     (sets || []).forEach(function (s) {
       if (s.date < from || s.date > to || !isNum(s.reps) || s.reps <= 0) return;
-      var m = muscleOf(s.exercise, exercises);
-      out[m] = (out[m] || 0) + 1;
+      var c = cache[s.exercise] || (cache[s.exercise] = { main: muscleOf(s.exercise, exercises), sec: secondaryOf(s.exercise, exercises) });
+      out[c.main] = (out[c.main] || 0) + 1;
+      c.sec.forEach(function (m) { out[m] = (out[m] || 0) + 0.5; });
     });
     return out;
   }
 
   return { range: range, e1rm: e1rm, last: last, suggest: suggest, warmup: warmup, best: best, history: history, progress: progress, exercisesDone: exercisesDone,
-    muscleOf: muscleOf, weeklyVolume: weeklyVolume, norm: norm };
+    muscleOf: muscleOf, secondaryOf: secondaryOf, weeklyVolume: weeklyVolume, norm: norm };
 })();
 </script>
 
@@ -3351,18 +3403,19 @@ Views.train = (function () {
         '<span class="field-box"><input inputmode="decimal" data-load placeholder="' + (phLoad == null ? 'kg' : String(phLoad).replace('.', ',')) + '" value="' + (saved && saved.load != null ? String(saved.load).replace('.', ',') : '') + '"><span class="unit">kg</span></span>' +
         '<button class="check" data-check="' + idx + '-' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
     }
-    var muscle = Train.muscleOf(p.exercise, Store.list('EXERCISES'));
+    var muscle = Train.muscleOf(p.exercise, Store.list('EXERCISES')), second = Train.secondaryOf(p.exercise, Store.list('EXERCISES'));
     var vids = Videos.of(p.exercise).length;
     return '<section class="card ex-card">' +
-      '<div class="ex-head"><div class="ex-fig" title="' + U.esc(muscle) + '">' + Body.mini([muscle]) + '</div>' +
+      '<div class="ex-head"><div class="ex-fig" title="' + U.esc([muscle].concat(second).join(', ')) + '">' + Body.mini([muscle], second) + '</div>' +
       '<div class="ex-head-text"><button class="ex-title" data-ex="' + U.esc(p.exercise) + '"><h2>' + U.esc(p.exercise) + '</h2></button>' +
-      '<div class="ex-meta"><span class="chip">' + U.esc((p.sets || '?') + ' × ' + (p.reps || '?')) + (p.rest ? ' · ' + U.esc(p.rest) : '') + '</span><span class="muted small">' + U.esc(muscle) + '</span></div>' +
+      '<div class="ex-meta"><span class="chip">' + U.esc((p.sets || '?') + ' × ' + (p.reps || '?')) + (p.rest ? ' · ' + U.esc(p.rest) : '') + '</span><span class="muted small">' + U.esc(muscle) + (second.length ? ' + ' + U.esc(second.join(', ')) : '') + '</span></div>' +
       '<button class="ex-video" data-video="' + U.esc(p.exercise) + '">' + App.icon('video', 'sm') + (vids ? 'Mes vidéos (' + vids + ')' : 'Ajouter une vidéo') + '</button></div></div>' +
       (p.cue ? '<details class="cue"><summary>Consignes</summary><p>' + U.esc(p.cue) + '</p>' + (p.links ? String(p.links).split(' ').map(function (l) { return '<a href="' + U.esc(l) + '" target="_blank" rel="noopener">Vidéo</a>'; }).join(' ') : '') + '</details>' : '') +
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + prev.sets.map(fmtSet).join(' · ') + '</p>' : '<p class="muted small">Première fois sur cet exercice.</p>') +
       (sug ? '<p class="tip">' + U.esc(sug.text) + '</p>' : '') +
       '<div class="sets">' + rows + '</div>' +
-      '<button class="btn ghost" data-more="' + idx + '">+ Série</button>' +
+      '<div class="set-actions">' + ((w.extra[p.exercise] || 0) > 0 ? '<button class="btn ghost" data-less="' + idx + '">− Série</button>' : '') +
+      '<button class="btn ghost" data-more="' + idx + '">+ Série</button></div>' +
       '</section>';
   }
 
@@ -3406,8 +3459,7 @@ Views.train = (function () {
   }
 
   function validate(root, key) {
-    var w = workout(), started = false;
-    if (!w) { w = start(picked(), true); started = true; } // première série validée : la séance démarre
+    var w = workout() || preview(picked()), started = false;
     var parts = key.split('-'), idx = Number(parts[0]), n = Number(parts[1]);
     var p = programFor(w.session)[idx];
     var row = root.querySelector('[data-row="' + key + '"]');
@@ -3415,7 +3467,18 @@ Views.train = (function () {
     var reps = U.parseNum(repsEl.value || repsEl.placeholder);
     var load = U.parseNum(loadEl.value || loadEl.placeholder);
     if (reps === null) { app.toast('Indique le nombre de reps'); repsEl.focus(); return; }
-    var id = setId(w, p.exercise, n);
+    var id = setId(w, p.exercise, n), was = savedSet(w, p.exercise, n);
+    if (was && was.reps === reps && was.load === load) { // série déjà validée, rien de changé : on la dévalide
+      Store.remove('SETS', was.id);
+      repsEl.value = ''; loadEl.value = '';
+      row.classList.remove('done', 'just');
+      app.stopTimer();
+      app.haptic(10);
+      var hs = document.querySelector('[data-head-sub]');
+      if (hs) hs.textContent = headSub(w);
+      return;
+    }
+    if (w.preview) { w = start(w.session, true); started = true; } // première série validée : la séance démarre
     var before = Train.best(sets(), p.exercise, id);
     Store.put('SETS', { id: id, date: w.date, sessionId: w.sessionId, session: w.session, exercise: p.exercise, setNo: n, reps: reps, load: load });
     repsEl.value = reps; loadEl.value = load == null ? '' : String(load).replace('.', ',');
@@ -3513,6 +3576,17 @@ Views.train = (function () {
       if ((b = e.target.closest('[data-session]'))) return sessionDetail(b.getAttribute('data-session'));
       if ((b = e.target.closest('[data-pick]'))) { state.trainPick = b.getAttribute('data-pick'); app.render(); return; }
       if ((b = e.target.closest('[data-video]'))) return Videos.open(app, b.getAttribute('data-video'));
+      if ((b = e.target.closest('[data-less]'))) {
+        var wl = workout() || start(picked(), true);
+        var pl = programFor(wl.session)[Number(b.getAttribute('data-less'))];
+        var last = root.querySelectorAll('[data-row^="' + b.getAttribute('data-less') + '-"]').length;
+        var gone = savedSet(wl, pl.exercise, last);
+        if (gone) Store.remove('SETS', gone.id);
+        wl.extra[pl.exercise] = Math.max(0, (wl.extra[pl.exercise] || 0) - 1);
+        saveWorkout(wl);
+        app.render();
+        return;
+      }
       if ((b = e.target.closest('[data-more]'))) {
         var w = workout() || start(picked(), true);
         var p = programFor(w.session)[Number(b.getAttribute('data-more'))];
@@ -4388,50 +4462,66 @@ var Scanner = (function () {
   <script>
 /*
  * Mannequin face / dos coloré selon le volume de chaque muscle (séries par semaine), et sa version
- * miniature qui montre le muscle travaillé par un exercice. SVG dessiné à la main : une moitié du corps,
- * reflétée pour l'autre côté. Les groupes viennent de Train.muscleOf (Pectoraux, Dos, Épaules…).
+ * miniature qui montre les muscles travaillés par un exercice.
+ *
+ * Dessin : chaque forme est une liste de points (moitié gauche, axe en x = 50, cadre 100 × 200) lissée en
+ * courbe fermée (Catmull-Rom), puis reflétée pour l'autre côté. Modifier un muscle = déplacer ses points.
+ * Les groupes viennent de Train.muscleOf / Train.secondaryOf.
  */
 var Body = (function () {
-  // Moitié gauche (à l'écran) d'une silhouette de 120 × 262, axe en x = 60 : cou, épaules, bras, torse, jambes.
-  var SIL = 'M60,31 C57.5,31 56,32 55.6,34.5 C55.3,37 54.8,39.5 53,41.2 C49,43.4 43.5,44.2 38.5,46 ' +
-    'C33.5,47.8 30.4,51.6 29.8,57.5 C29.2,65 28.6,73 28,81 C27.4,88.5 26.4,95.5 25.2,102 C23.4,112 21.6,122 20.4,131.5 ' +
-    'C19.6,137 18.4,141 18.2,145.5 C17.8,151.5 19,156.5 21.4,156.2 C23.6,155.9 24.3,151 24.6,146.5 C25,141.5 26,137 27.2,132.5 ' +
-    'C29.6,122.5 31.8,112 33.4,102.5 C34.4,96 35.4,89.5 36.3,83.5 C37.2,77.5 38.1,71 39.2,66.5 ' +
-    'C40.3,73.5 41,81 41.2,88.5 C41.4,97 42,105 43,112 C43.6,118 42,124.5 40.4,130.5 C38.4,138 37.2,146 37.2,156 ' +
-    'C37.2,169 38.6,180.5 40,190 C40.6,195.5 39.6,200 39.2,205.5 C38.4,215.5 39,226 40.8,235.5 C41.4,241.5 40.4,245.5 38.4,248.6 ' +
-    'C36.6,251.6 40.4,253.8 46.4,253.2 C49.8,252.8 50.4,249 49.6,244 C48.6,237.5 49.4,227.5 50.4,218 ' +
-    'C51.2,209 51.2,200.5 51.2,194 C51.8,186 53.6,174 55,162 C56,153.5 57.6,147 60,144.5 Z';
-  var HEAD = '<path class="bm-sil" d="M60,4.2 C66.6,4.2 71,9.4 71,17.4 C71,24.6 67.6,29.4 63.6,31.4 C61.4,32.4 58.6,32.4 56.4,31.4 ' +
-    'C52.4,29.4 49,24.6 49,17.4 C49,9.4 53.4,4.2 60,4.2 Z"/>';
+  // Silhouette (moitié gauche, du haut du crâne à l'entrejambe) : tête, cou, épaule, bras, main, flanc, jambe, pied, jusqu'à l'entrejambe.
+  var SIL = [[50, 1.8], [45.2, 3.6], [42.6, 8.6], [42.6, 14], [44.4, 18.8], [46, 21.4], [45.4, 26.4], [38.5, 30.4], [30.5, 32.6], [25.2, 36.4], [22.6, 43.5], [21.6, 52], [20.3, 61.5],
+    [18.8, 71.5], [17.2, 82], [15.4, 88.5], [14.6, 95.5], [16.6, 99.6], [19.4, 96], [20.6, 89.5], [22.6, 82], [25, 72], [26.8, 62.5],
+    [28, 55], [29.6, 50.5], [31, 60], [31.8, 72], [31.4, 84], [30, 95], [29.4, 108], [30.4, 122], [32, 137], [32.4, 148], [31.6, 160],
+    [33, 175], [34.4, 185.5], [32.6, 192.5], [39.6, 195.2], [42.2, 190], [42.4, 180], [43, 165], [44, 150], [45.4, 135], [47.2, 118],
+    [50, 108.5]]; // dernier point : entrejambe, sur l'axe
 
-  // Zones musculaires (moitié gauche) : [groupe, tracé]
   var FRONT = [
-    ['Dos', 'M54.2,41.6 C50.6,43.4 46.4,44.4 42.6,45.4 C47.4,46.6 52.6,46.8 57.6,46.4 C56.6,44.8 55.4,43.2 54.2,41.6 Z'],
-    ['Épaules', 'M41.4,46.6 C35.6,47.4 31.6,51.2 30.8,57.6 C30.4,62.4 30.8,66.6 32,70 C34,64.6 37.4,60.4 42.2,58.4 C42.6,54.2 42.4,50.2 41.4,46.6 Z'],
-    ['Pectoraux', 'M59,48.6 C53.6,47.2 47.2,48.2 43.6,53.4 C41.8,58.2 42.6,64.6 45.6,68.8 C49.6,71.8 55,72.2 59,69.6 Z'],
-    ['Biceps', 'M37.6,64.2 C33.8,68.2 31.6,75 31.4,82.6 C31.4,88.6 32.4,93.4 34.2,95.8 C36,91.8 37.2,85.4 37.9,78.4 C38.3,72.6 38.2,67.6 37.6,64.2 Z'],
-    ['Avant-bras', 'M32.6,100.4 C29.6,108.6 26.6,118.2 24.6,128.2 C24.6,130.6 26.2,131.6 27.4,130.6 C29.6,121.6 31.8,111.8 34.2,103.4 C34.2,101.6 33.6,100.6 32.6,100.4 Z'],
-    ['Abdos', 'M59,75 L52.4,75.4 C50.6,88.4 50.4,102.4 51.4,115.8 C53.2,122.6 56,127.6 59,130.4 Z'],
-    ['Obliques', 'M49.2,75.6 C45.6,82.4 44.2,93.6 44.4,104 C44.6,111 46.2,116.8 49.4,120.6 C48.2,106.2 48.2,90.4 49.2,75.6 Z'],
-    ['Quadriceps', 'M41.2,136.2 C38.4,150.2 38.4,166.4 41,182 C44,186.2 49,186.4 52.2,182.2 C54.2,169.2 55.2,155.4 55.2,145.4 C51.4,140.2 46.4,137.2 41.2,136.2 Z'],
-    ['Adducteurs', 'M57.4,147.4 C56.2,156 55.2,164.4 54.2,172.4 C56.4,164.4 58.2,155.6 59.2,148.2 Z'],
-    ['Mollets', 'M41.2,200.4 C39.4,210.2 39.4,222 42,232.2 L45.2,232.2 C46.4,222 47.2,210.2 47,200.4 C45.2,197.4 42.6,197.4 41.2,200.4 Z']
+    ['Trapèzes', [[46.4, 25.6], [41.5, 29.6], [46.6, 30.4]]],
+    ['Épaules', [[31.6, 33.6], [26, 36.8], [23.4, 43.6], [24.4, 49.6], [27.8, 45.6], [31.6, 40.2], [34, 36]]],
+    ['Pectoraux', [[48.4, 35.8], [40.4, 34.4], [34.2, 37.4], [31.6, 43], [33.4, 48.8], [39.4, 51.8], [48.4, 50.8]]],
+    ['Biceps', [[27.4, 47.6], [24.4, 50.8], [23, 57.4], [23.4, 62], [25.8, 61], [27.4, 55]]],
+    ['Avant-bras', [[22.6, 64.6], [20, 72.4], [18.6, 81], [20.6, 81.6], [23, 73.4], [25.4, 65.8]]],
+    ['Abdos', [[48.8, 54], [43.6, 54.4], [43, 66], [43.4, 80], [44.8, 91.6], [48.8, 97.6]]],
+    ['Obliques', [[41.4, 55.2], [34.4, 56.4], [33.4, 68], [35, 81.6], [41, 89.6], [41.6, 72]]],
+    ['Quadriceps', [[32.4, 103.6], [31.8, 118], [33.2, 133.4], [37, 140.6], [41.8, 139], [44.8, 125], [45.8, 112.6], [41, 104.6]]],
+    ['Adducteurs', [[47.6, 110.6], [45.8, 118.4], [45, 126], [48.6, 115]]],
+    ['Mollets', [[33.8, 152], [33.2, 163.6], [35.2, 174], [38.2, 173.6], [39.6, 162], [38.2, 151.6]]]
   ];
   var BACK = [
-    ['Dos', 'M60,33.5 C57.4,37.4 54,40.8 46.4,45 C50.6,49.4 54.6,56 57.4,63.4 C58.6,67.6 59.4,72 60,76 Z'],
-    ['Épaules', 'M41.4,46.6 C35.6,47.4 31.6,51.2 30.8,57.6 C30.4,62.4 30.8,66.6 32,70 C34.4,65.6 38.6,61.8 43.6,59.8 C44.4,55.4 43.6,50.4 41.4,46.6 Z'],
-    ['Dos', 'M57,68 C53.4,61.2 48.4,58.2 43.4,60.8 C41.4,70.4 42,82.4 44,94 C46,100.2 49,104 52,104.2 C54.2,96 56.8,88 58,80 Z'],
-    ['Triceps', 'M38.2,63.2 C34.2,68 31.6,75.6 31.4,84.4 C31.4,90 32.6,94.4 34.4,96.4 C36.4,91.6 37.6,85.6 38.2,78.8 C38.6,72.6 38.6,67.2 38.2,63.2 Z'],
-    ['Avant-bras', 'M32.6,100.4 C29.6,108.6 26.6,118.2 24.6,128.2 C24.6,130.6 26.2,131.6 27.4,130.6 C29.6,121.6 31.8,111.8 34.2,103.4 C34.2,101.6 33.6,100.6 32.6,100.4 Z'],
-    ['Lombaires', 'M59,86 C57,94 55,102 54,110 C54,116 56,120 59,121 Z'],
-    ['Fessiers', 'M59,125 C53,122 45,123 41,130 C39,138 41,147 47,150 C52,152 57,149 59,145 Z'],
-    ['Ischios', 'M42,154 C40,164 40,174 42,184 C45,187 49,187 52,184 C54,174 55,164 55,155 C51,152 46,152 42,154 Z'],
-    ['Mollets', 'M41,194 C38,203 38,214 41,224 C43,228 47,228 48,224 C50,214 50,203 48,195 C46,191 43,191 41,194 Z']
+    ['Trapèzes', [[50, 22.4], [45.4, 27.6], [36.4, 31.8], [42.4, 37.6], [50, 46.4]]],
+    ['Épaules', [[31.6, 33.6], [26, 36.8], [23.4, 43.6], [24.4, 49.6], [27.8, 45.6], [31.6, 40.2], [34.6, 35.6]]],
+    ['Rhomboïdes', [[49.4, 48.4], [43, 40.4], [40, 43.4], [41.2, 48.6], [46, 53.2], [49.4, 54.2]]],
+    ['Grand rond', [[34.6, 41.6], [30.6, 44.6], [30.8, 48.8], [34.4, 49], [37.4, 45.6]]],
+    ['Grand dorsal', [[38.6, 50.4], [32.8, 52.4], [32.2, 62], [34.2, 72], [40, 80], [47, 84], [49.4, 76], [49.4, 58.6], [45.6, 56], [41, 53]]],
+    ['Triceps', [[27.4, 47.6], [24.4, 50.8], [23, 57.4], [23.4, 62], [25.8, 61], [27.4, 55]]],
+    ['Avant-bras', [[22.6, 64.6], [20, 72.4], [18.6, 81], [20.6, 81.6], [23, 73.4], [25.4, 65.8]]],
+    ['Lombaires', [[49.4, 86.4], [44.2, 88.4], [43.2, 94], [49.4, 97]]],
+    ['Fessiers', [[49.4, 99.6], [40, 98.6], [32.4, 103.4], [31.8, 113], [37, 120], [45, 120.4], [49.4, 115]]],
+    ['Ischios', [[32.6, 123.4], [33, 135], [36, 142], [42, 142], [45.6, 132], [46.2, 122.6], [40, 121.6]]],
+    ['Mollets', [[33.2, 148.4], [32.2, 158], [34.6, 170], [38, 171], [41, 162], [40.6, 150.4], [37, 146.4]]]
   ];
   // Groupe du mannequin → groupe compté (les obliques comptent avec les abdos).
   var ALIAS = { Obliques: 'Abdos' };
-  var ABS_LINES = 'M52.2,88.6 L59,88.6 M51.6,100.6 L59,100.6 M52,112.6 L59,112.6';
-  var BACK_ONLY = ['Dos', 'Triceps', 'Lombaires', 'Fessiers', 'Ischios'];
+  var ABS_LINES = 'M43.4,65.4 L48.8,65.4 M43.6,75.6 L48.8,75.6 M44.2,85.6 L48.8,85.6';
+  var BACK_LINES = 'M41.6,49 C44,51.6 46.6,53.4 49.4,54.2';
+  var BACK_ONLY = ['Grand dorsal', 'Rhomboïdes', 'Grand rond', 'Trapèzes', 'Triceps', 'Lombaires', 'Fessiers', 'Ischios'];
+
+  /** Courbe fermée lisse passant par les points (Catmull-Rom → Bézier). */
+  function smooth(pts) {
+    var n = pts.length, f = function (v) { return Math.round(v * 10) / 10; };
+    var d = 'M' + f(pts[0][0]) + ',' + f(pts[0][1]);
+    for (var i = 0; i < n; i++) {
+      var p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+      d += ' C' + f(p1[0] + (p2[0] - p0[0]) / 6) + ',' + f(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+        f(p2[0] - (p3[0] - p1[0]) / 6) + ',' + f(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f(p2[0]) + ',' + f(p2[1]);
+    }
+    return d + 'Z';
+  }
+  // Silhouette entière d'un seul tenant (pas de couture au milieu) : moitié gauche puis son reflet.
+  var SIL_D = smooth(SIL.concat(SIL.slice(1, -1).reverse().map(function (p) { return [100 - p[0], p[1]]; })));
+  var paths = {};
+  function pathOf(z) { return paths[z[0] + z[1][0]] || (paths[z[0] + z[1][0]] = smooth(z[1])); }
 
   /** Niveau de couleur (0 à 4) selon les séries de la semaine. */
   function level(n) {
@@ -4444,33 +4534,35 @@ var Body = (function () {
     var id = 'bm' + (++uid);
     var shapes = zones.map(function (z) {
       var g = ALIAS[z[0]] || z[0], lv = levelOf(g);
-      return '<path d="' + z[1] + '" class="bm bm-' + lv.l + '" data-muscle="' + g + '"' + (lv.l ? ' fill="url(#' + id + 'g)"' : '') + '>' + (lv.t ? '<title>' + lv.t + '</title>' : '') + '</path>';
+      return '<path d="' + pathOf(z) + '" class="bm bm-' + lv.l + '" data-muscle="' + g + '"' + (lv.l ? ' fill="url(#' + id + 'g)"' : '') + '>' + (lv.t ? '<title>' + lv.t + '</title>' : '') + '</path>';
     }).join('');
-    var half = '<path d="' + SIL + '" class="bm-sil"/>' + shapes + (deco ? '<path d="' + deco + '" class="bm-line"/>' : '');
-    return '<svg viewBox="0 0 120 262" class="body-fig ' + (cls || '') + '" role="img" aria-label="' + label + '">' +
+    var half = shapes + (deco ? '<path d="' + deco + '" class="bm-line"/>' : '');
+    return '<svg viewBox="8 0 84 200" class="body-fig ' + (cls || '') + '" role="img" aria-label="' + label + '">' +
       '<defs><radialGradient id="' + id + 'g" cx="50%" cy="38%" r="70%"><stop offset="0" class="bm-g1"/><stop offset="1" class="bm-g2"/></radialGradient>' +
       '<linearGradient id="' + id + 's" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="bm-s1"/><stop offset="1" class="bm-s2"/></linearGradient></defs>' +
-      '<g class="bm-body" style="--sil:url(#' + id + 's)">' + HEAD + '<g>' + half + '</g><g transform="matrix(-1 0 0 1 120 0)">' + half + '</g></g></svg>';
+      '<g class="bm-body" style="--sil:url(#' + id + 's)"><path d="' + SIL_D + '" class="bm-sil"/><g>' + half + '</g><g transform="matrix(-1 0 0 1 100 0)">' + half + '</g></g></svg>';
   }
 
-  /** Les deux faces côte à côte. vol = { Pectoraux: 12, Dos: 9, … } */
+  /** Les deux faces côte à côte. vol = { Pectoraux: 12, 'Grand dorsal': 9, … } */
   function svg(vol) {
     vol = vol || {};
-    var lv = function (g) { var n = vol[g] || 0; return { l: level(n), t: g + ' : ' + n + ' série' + (n > 1 ? 's' : '') }; };
+    var lv = function (g) { var n = vol[g] || 0; return { l: level(n), t: g + ' : ' + String(n).replace('.', ',') + ' série' + (n > 1 ? 's' : '') }; };
     return '<div class="body-map">' +
       '<figure>' + figure(FRONT, lv, 'Face', ABS_LINES) + '<figcaption>Face</figcaption></figure>' +
-      '<figure>' + figure(BACK, lv, 'Dos') + '<figcaption>Dos</figcaption></figure></div>' +
+      '<figure>' + figure(BACK, lv, 'Dos', BACK_LINES) + '<figcaption>Dos</figcaption></figure></div>' +
       '<div class="body-legend"><span>0</span><i class="bm-0"></i><i class="bm-1"></i><i class="bm-2"></i><i class="bm-3"></i><i class="bm-4"></i><span>15+ séries</span></div>';
   }
 
-  /** Petit mannequin (face ou dos, selon où se voient le mieux les muscles) avec les muscles donnés allumés. */
-  function mini(muscles) {
-    muscles = (muscles || []).filter(function (m) { return m && m !== 'Autre'; });
+  /** Petit mannequin (face ou dos, selon où se voit le muscle principal) : principaux allumés, secondaires en plus clair. */
+  function mini(muscles, secondary) {
+    var keep = function (m) { return m && m !== 'Autre'; };
+    muscles = (muscles || []).filter(keep);
+    secondary = (secondary || []).filter(keep);
     var back = muscles.filter(function (m) { return BACK_ONLY.indexOf(m) >= 0; }).length;
     var front = muscles.length - back;
     var useBack = back > front || (back === front && back > 0);
-    var lv = function (g) { return { l: muscles.indexOf(g) >= 0 ? 4 : 0, t: '' }; };
-    return figure(useBack ? BACK : FRONT, lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.join(', '), useBack ? null : ABS_LINES, 'mini');
+    var lv = function (g) { return { l: muscles.indexOf(g) >= 0 ? 4 : secondary.indexOf(g) >= 0 ? 2 : 0, t: '' }; };
+    return figure(useBack ? BACK : FRONT, lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.concat(secondary).join(', '), useBack ? BACK_LINES : ABS_LINES, 'mini');
   }
 
   return { svg: svg, mini: mini, level: level };
@@ -4846,6 +4938,64 @@ var Views = window.Views || {};
 Views.trends = (function () {
   var W = 340, H = 170, PAD = { l: 34, r: 10, t: 12, b: 22 };
 
+  // ---------------------------------------------------------------- bulles de détail des graphiques
+
+  /** Attributs d'un point qui a une bulle : position (unités du viewBox) et lignes du texte. */
+  function tipAttr(x, y, lines) {
+    return ' data-tx="' + Number(x).toFixed(1) + '" data-ty="' + Number(y).toFixed(1) + '" data-tip="' + U.esc(lines.filter(Boolean).join('\n')) + '"';
+  }
+  function box(svg) { return '<div class="chart-box">' + svg + '</div>'; }
+
+  var NS = 'http://www.w3.org/2000/svg', current = null;
+  function hideTip() {
+    if (!current) return;
+    current.classList.remove('tipping');
+    var t = current.parentNode.querySelector('.chart-tip');
+    if (t) t.hidden = true;
+    current = null;
+  }
+  /** Bulle sur le point le plus proche (en x) du doigt ou du curseur. */
+  function showTip(svg, clientX) {
+    var pts = svg.querySelectorAll('[data-tip]');
+    if (!pts.length) return;
+    var r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+    var vx = vb.x + (clientX - r.left) / r.width * vb.width, pick = null, dist = Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      var d = Math.abs(Number(pts[i].getAttribute('data-tx')) - vx);
+      if (d < dist) { dist = d; pick = pts[i]; }
+    }
+    if (current && current !== svg) hideTip();
+    current = svg;
+    svg.classList.add('tipping');
+    var tx = Number(pick.getAttribute('data-tx')), ty = Number(pick.getAttribute('data-ty'));
+    var guide = svg.querySelector('.tip-guide'), ring = svg.querySelector('.tip-ring');
+    if (!guide) {
+      guide = document.createElementNS(NS, 'line'); guide.setAttribute('class', 'tip-guide');
+      ring = document.createElementNS(NS, 'circle'); ring.setAttribute('class', 'tip-ring'); ring.setAttribute('r', '6');
+      svg.insertBefore(guide, svg.firstChild); svg.appendChild(ring);
+    }
+    guide.setAttribute('x1', tx); guide.setAttribute('x2', tx); guide.setAttribute('y1', vb.y); guide.setAttribute('y2', vb.y + vb.height - 18);
+    ring.setAttribute('cx', tx); ring.setAttribute('cy', ty);
+    var boxEl = svg.parentNode, tip = boxEl.querySelector('.chart-tip');
+    if (!tip) { tip = document.createElement('div'); tip.className = 'chart-tip'; boxEl.appendChild(tip); }
+    var lines = pick.getAttribute('data-tip').split('\n');
+    tip.innerHTML = '<b>' + U.esc(lines[0]) + '</b>' + lines.slice(1).map(function (l) { return '<span>' + U.esc(l) + '</span>'; }).join('');
+    tip.hidden = false;
+    var px = (tx - vb.x) / vb.width * r.width, py = (ty - vb.y) / vb.height * r.height;
+    var tw = tip.offsetWidth, th = tip.offsetHeight, bw = boxEl.clientWidth;
+    tip.style.left = Math.max(0, Math.min(bw - tw, px - tw / 2)) + 'px';
+    tip.style.top = (py - th - 12 >= -8 ? py - th - 12 : py + 14) + 'px';
+  }
+  document.addEventListener('pointerdown', function (e) {
+    var svg = e.target.closest && e.target.closest('.tip-chart');
+    if (svg) showTip(svg, e.clientX); else hideTip();
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    var svg = e.target.closest && e.target.closest('.tip-chart');
+    if (svg && (e.pointerType === 'mouse' || current === svg)) showTip(svg, e.clientX);
+    else if (!svg && e.pointerType === 'mouse') hideTip();
+  });
+
   function weightChart(daily, end, days) {
     var start = U.addDays(end, -(days - 1));
     var m = {};
@@ -4872,9 +5022,15 @@ Views.trends = (function () {
     [0, Math.floor((days - 1) / 2), days - 1].forEach(function (i) {
       ticks += '<text x="' + x(i) + '" y="' + (H - 6) + '" class="axis" text-anchor="' + (i === 0 ? 'start' : i === days - 1 ? 'end' : 'middle') + '">' + U.shortDate(U.addDays(start, i)) + '</text>';
     });
-    var dots = pts.map(function (p) { return '<circle cx="' + x(p.i) + '" cy="' + y(p.v) + '" r="2.6" class="dot"/>'; }).join('');
+    var avgAt = {};
+    avg.forEach(function (p) { avgAt[p.i] = p.v; });
+    var dots = pts.map(function (p) {
+      var date = U.addDays(start, p.i);
+      return '<circle cx="' + x(p.i) + '" cy="' + y(p.v) + '" r="2.6" class="dot"' + tipAttr(x(p.i), y(p.v),
+        [U.dayLetter(date) + ' ' + U.shortDate(date), 'Pesée : ' + U.nf(p.v) + ' kg', avgAt[p.i] != null ? 'Moyenne 7 j : ' + U.nf(avgAt[p.i]) + ' kg' : '']) + '/>';
+    }).join('');
     var line = avg.length > 1 ? '<polyline class="trend" points="' + avg.map(function (p) { return x(p.i) + ',' + y(p.v); }).join(' ') + '"/>' : '';
-    return '<svg viewBox="0 0 ' + W + ' ' + H + '" class="chart" role="img" aria-label="Poids sur ' + days + ' jours">' + grid + ticks + dots + line + '</svg>' +
+    return box('<svg viewBox="0 0 ' + W + ' ' + H + '" class="chart tip-chart" role="img" aria-label="Poids sur ' + days + ' jours">' + grid + ticks + line + dots + '</svg>') +
       '<div class="legend"><span><i class="lg-dot"></i>Pesée du jour</span><span><i class="lg-line"></i>Moyenne 7 jours</span></div>';
   }
 
@@ -4891,7 +5047,8 @@ Views.trends = (function () {
       if (s !== null) {
         any = true;
         var bh = Math.max(2, s / 25 * (base - 8));
-        bars += '<rect x="' + (PAD.l + i * bw + 1.5) + '" y="' + (base - bh) + '" width="' + Math.max(2, bw - 3) + '" height="' + bh + '" rx="2" class="' + (s < 12.5 ? 'bar-low' : 'bar') + '"><title>' + U.shortDate(date) + ' : ' + U.nf(s) + '/25</title></rect>';
+        bars += '<rect x="' + (PAD.l + i * bw + 1.5) + '" y="' + (base - bh) + '" width="' + Math.max(2, bw - 3) + '" height="' + bh + '" rx="2" class="' + (s < 12.5 ? 'bar-low' : 'bar') + '"' +
+          tipAttr(PAD.l + i * bw + bw / 2, base - bh, [U.dayLetter(date) + ' ' + U.shortDate(date), 'Forme : ' + U.nf(s) + ' / 25']) + '/>';
       }
       if (U.dow(date) === 1) bars += '<text x="' + (PAD.l + i * bw + bw / 2) + '" y="' + (h - 6) + '" class="axis" text-anchor="middle">' + U.shortDate(date) + '</text>';
     }
@@ -4900,7 +5057,7 @@ Views.trends = (function () {
     var axis = '<text x="' + (PAD.l - 6) + '" y="' + (y25 + 3) + '" class="axis" text-anchor="end">25</text>' +
       '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y125 + '" y2="' + y125 + '" class="grid"/>' +
       '<text x="' + (PAD.l - 6) + '" y="' + (y125 + 3) + '" class="axis" text-anchor="end">12,5</text>';
-    return '<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart" role="img" aria-label="Score de forme sur ' + days + ' jours">' + axis + bars + '</svg>';
+    return box('<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart tip-chart" role="img" aria-label="Score de forme sur ' + days + ' jours">' + axis + bars + '</svg>');
   }
 
   function table(daily, end, days) {
@@ -4917,26 +5074,68 @@ Views.trends = (function () {
     return '<div class="table-wrap"><table class="data"><thead><tr><th>Jour</th><th>Poids</th><th>Kcal</th><th>Pas</th><th>Sommeil</th><th>Forme</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
-  /** Feuille « Toutes les données » : tableau jour par jour, 30 jours de plus à chaque appui. */
+  /** Toutes les séances faites (les plus récentes d'abord) : [{ key, date, name, exercises: [{ name, sets }], sets, volume }]. */
+  function workoutLog() {
+    var by = {};
+    Store.list('SETS').forEach(function (s) {
+      if (!s.date || !s.exercise) return;
+      var k = s.sessionId || (s.date + ' ' + (s.session || ''));
+      var w = by[k] = by[k] || { key: k, date: s.date, name: s.session || 'Séance', ex: {}, order: [], sets: 0, volume: 0 };
+      if (!w.ex[s.exercise]) { w.ex[s.exercise] = []; w.order.push(s.exercise); }
+      w.ex[s.exercise].push(s);
+      w.sets++;
+      if (typeof s.load === 'number' && typeof s.reps === 'number') w.volume += s.load * s.reps;
+    });
+    return Object.keys(by).map(function (k) {
+      var w = by[k];
+      w.exercises = w.order.map(function (n) { return { name: n, sets: w.ex[n].sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); }) }; });
+      return w;
+    }).sort(function (a, b) { return a.date === b.date ? (a.name < b.name ? -1 : 1) : (a.date < b.date ? 1 : -1); });
+  }
+  function fmtSet(x) { return (x.reps == null ? '?' : U.nf(x.reps, 0)) + ' × ' + (x.load == null ? '–' : U.nf(x.load) + ' kg'); }
+
+  function workoutsHtml(list, n) {
+    if (!list.length) return '<p class="muted">Aucune séance enregistrée pour l\'instant.</p>';
+    return '<p class="muted small">' + list.length + ' séance' + (list.length > 1 ? 's' : '') + ' en tout, de la plus récente à la plus ancienne.</p>' +
+      list.slice(0, n).map(function (w) {
+        var sess = Store.get('SESSIONS', w.key) || {};
+        var meta = [w.sets + ' séries', U.nf(w.volume / 1000, 1) + ' t', sess.durationMin ? sess.durationMin + ' min' : '', sess.rpe != null ? 'RPE ' + sess.rpe : ''].filter(Boolean).join(' · ');
+        return '<div class="wk"><div class="wk-head"><b>' + U.esc(w.name) + '</b><span class="muted small">' + U.dayLetter(w.date) + ' ' + U.shortDate(w.date) + ' ' + w.date.slice(0, 4) + '</span></div>' +
+          '<p class="muted small">' + meta + (sess.note ? ' · ' + U.esc(sess.note) : '') + '</p>' +
+          '<ul class="wk-ex">' + w.exercises.map(function (e) {
+            return '<li><span>' + U.esc(e.name) + '</span><span class="muted small">' + e.sets.map(fmtSet).join(' · ') + '</span></li>';
+          }).join('') + '</ul></div>';
+      }).join('') +
+      (n < list.length ? '<button class="btn ghost block" data-more-wk>20 séances de plus</button>' : '');
+  }
+
+  /** Feuille « Toutes les données » : jours (tableau, 30 jours de plus à chaque appui) ou séances (liste complète). */
   function openData(app, state) {
-    var daily = Store.list('DAILY'), end = U.today(), days = 30;
+    var daily = Store.list('DAILY'), end = U.today(), days = 30, nWk = 20, tab = state.dataTab || 'days', log = null;
     var oldest = daily.reduce(function (o, d) { return d.date && d.date < o ? d.date : o; }, end);
     var max = Math.max(30, U.daysBetween(oldest, end) + 1);
     var body = function () {
+      if (tab === 'workouts') return workoutsHtml(log || (log = workoutLog()), nWk);
       return '<p class="muted small">Poids en kg, sommeil en heures, forme sur 25. Touche un jour pour l\'ouvrir.</p>' + table(daily, end, Math.min(days, max)) +
         (days < max ? '<button class="btn ghost block" data-more-days>30 jours de plus</button>' : '');
     };
+    var seg = '<div class="seg data-seg">' + [['days', 'Jours'], ['workouts', 'Séances']].map(function (t) {
+      return '<button data-data-tab="' + t[0] + '" aria-pressed="' + (t[0] === tab) + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
     app.openSheet({
       title: 'Toutes les données',
-      html: '<div data-data-body>' + body() + '</div>',
+      html: seg + '<div data-data-body>' + body() + '</div>',
       bind: function (sh) {
+        var redraw = function () { sh.querySelector('[data-data-body]').innerHTML = body(); if (window.Liquid && Liquid.track) Liquid.track(400); };
         sh.addEventListener('click', function (e) {
-          if (e.target.closest('[data-more-days]')) {
-            days += 30;
-            sh.querySelector('[data-data-body]').innerHTML = body();
-            if (window.Liquid && Liquid.track) Liquid.track(400);
-            return;
+          var t = e.target.closest('[data-data-tab]');
+          if (t) {
+            tab = state.dataTab = t.getAttribute('data-data-tab');
+            sh.querySelectorAll('[data-data-tab]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === t)); });
+            return redraw();
           }
+          if (e.target.closest('[data-more-days]')) { days += 30; return redraw(); }
+          if (e.target.closest('[data-more-wk]')) { nWk += 20; return redraw(); }
           var row = e.target.closest('[data-goto]');
           if (row) { state.date = row.getAttribute('data-goto'); state.tab = 'today'; app.closeSheet(); app.render(); }
         });
@@ -4948,7 +5147,8 @@ Views.trends = (function () {
 
   /**
    * Courbe d'une série de points datés [{ date, v }] (du plus ancien), axe des dates proportionnel.
-   * opts = { unit, dec, label }. Le record est marqué d'un point plus gros.
+   * opts = { unit, dec, label, detail(p) → lignes en plus dans la bulle }. Le record est marqué et légendé ;
+   * toucher ou survoler la courbe affiche le détail du point le plus proche.
    */
   function lineChart(pts, opts) {
     opts = opts || {};
@@ -4974,12 +5174,17 @@ Views.trends = (function () {
     var line = pts.map(function (p) { return x(p).toFixed(1) + ',' + y(p.v).toFixed(1); }).join(' ');
     var area = '<polygon class="area" points="' + x(pts[0]).toFixed(1) + ',' + y(lo) + ' ' + line + ' ' + x(pts[pts.length - 1]).toFixed(1) + ',' + y(lo) + '"/>';
     var best = Math.max.apply(null, vs), bi = vs.lastIndexOf(best);
+    var unit = opts.unit ? ' ' + opts.unit : '';
     var dots = pts.map(function (p, i) {
-      return '<circle cx="' + x(p).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (i === bi ? 4.5 : 3) + '" class="' + (i === bi ? 'dot-best' : 'dot-accent') + '"><title>' +
-        U.shortDate(p.date) + ' : ' + U.nf(p.v, dec) + (opts.unit ? ' ' + opts.unit : '') + '</title></circle>';
+      var lines = [U.dayLetter(p.date) + ' ' + U.shortDate(p.date) + ' ' + p.date.slice(0, 4), (opts.name || '') + (opts.name ? ' : ' : '') + U.nf(p.v, dec) + unit + (i === bi ? ' · record' : '')]
+        .concat(opts.detail ? opts.detail(p) : []);
+      return '<circle cx="' + x(p).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (i === bi ? 4.5 : 3) + '" class="' + (i === bi ? 'dot-best' : 'dot-accent') + '"' +
+        tipAttr(x(p), y(p.v), lines) + '/>';
     }).join('');
-    return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="chart" role="img" aria-label="' + U.esc(opts.label || '') + '">' + grid + ticks + area +
-      '<polyline class="trend" points="' + line + '"/>' + dots + '</svg>';
+    var bx = x(pts[bi]), by = y(best);
+    var peak = '<text class="peak" x="' + bx.toFixed(1) + '" y="' + (by - 9).toFixed(1) + '" text-anchor="' + (bx > w - 40 ? 'end' : bx < P.l + 30 ? 'start' : 'middle') + '">' + U.nf(best, dec) + unit + '</text>';
+    return box('<svg viewBox="0 0 ' + w + ' ' + h + '" class="chart tip-chart" role="img" aria-label="' + U.esc(opts.label || '') + '">' + grid + ticks + area +
+      '<polyline class="trend" points="' + line + '"/>' + dots + peak + '</svg>');
   }
 
   // ---------------------------------------------------------------- progression par exercice
@@ -5005,7 +5210,13 @@ Views.trends = (function () {
         '<div class="stat"><span class="tile-label">Dernière</span><b>' + U.nf(last, mt[4]) + ' ' + mt[3] + '</b></div>' +
         '<div class="stat"><span class="tile-label">Évolution</span><b class="' + (pct > 0 ? 'ok' : pct < 0 ? 'neg' : '') + '">' + (pct === null || pts.length < 2 ? '–' : U.signed(pct, 0) + ' %') + '</b></div></div>';
     }
-    return stats + lineChart(pts, { unit: mt[3], dec: mt[4], label: mt[2] + ' : ' + name }) +
+    var byDate = {};
+    Train.history(Store.list('SETS'), name).forEach(function (d) { byDate[d.date] = d.sets; });
+    var detail = function (p) {
+      var ss = byDate[p.date] || [];
+      return [ss.length + ' série' + (ss.length > 1 ? 's' : '') + ' : ' + ss.map(function (x) { return (x.reps == null ? '?' : U.nf(x.reps, 0)) + ' × ' + (x.load == null ? '–' : U.nf(x.load) + ' kg'); }).join(' · ')];
+    };
+    return stats + lineChart(pts, { unit: mt[3], dec: mt[4], label: mt[2] + ' : ' + name, name: mt[1], detail: detail }) +
       '<p class="muted small">' + mt[5] + ' ' + prog.length + ' séance' + (prog.length > 1 ? 's' : '') + '.</p>';
   }
 
