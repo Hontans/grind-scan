@@ -1206,7 +1206,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:22 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:27 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5029,30 +5029,31 @@ Views.trends = (function () {
       '<div class="legend"><span><i class="lg-dot"></i>Pesée du jour</span><span><i class="lg-line"></i>Moyenne 7 jours</span></div>';
   }
 
-  function readinessChart(daily, end, days) {
+  /** Heures de sommeil par nuit (barres), repère à 7 h ; sous 7 h la barre passe en couleur d'alerte. */
+  function sleepChart(daily, end, days) {
     var m = {};
     daily.forEach(function (d) { m[d.date] = d; });
     var start = U.addDays(end, -(days - 1));
     var bw = (W - PAD.l - PAD.r) / days;
-    var h = 110, base = h - 20;
-    var bars = '', any = false;
+    var h = 120, top = 10, base = h - 20, bars = '', vals = [];
+    for (var j = 0; j < days; j++) { var dj = m[U.addDays(start, j)]; if (dj && typeof dj.sleepH === 'number') vals.push(dj.sleepH); }
+    if (!vals.length) return '<p class="muted">Les barres apparaissent dès que tes heures de sommeil sont notées le matin.</p>';
+    var hi = Math.max(10, Math.ceil(Math.max.apply(null, vals)));
+    var y = function (v) { return base - v / hi * (base - top); };
     for (var i = 0; i < days; i++) {
-      var date = U.addDays(start, i);
-      var s = Calc.readiness(m[date]);
-      if (s !== null) {
-        any = true;
-        var bh = Math.max(2, s / 25 * (base - 8));
-        bars += '<rect x="' + (PAD.l + i * bw + 1.5) + '" y="' + (base - bh) + '" width="' + Math.max(2, bw - 3) + '" height="' + bh + '" rx="2" class="' + (s < 12.5 ? 'bar-low' : 'bar') + '"' +
-          tipAttr(PAD.l + i * bw + bw / 2, base - bh, [U.dayLetter(date) + ' ' + U.shortDate(date), 'Forme : ' + U.nf(s) + ' / 25']) + '/>';
+      var date = U.addDays(start, i), d = m[date] || {};
+      if (typeof d.sleepH === 'number') {
+        var hh = Math.max(2, base - y(d.sleepH)), s = Calc.readiness(d);
+        bars += '<rect x="' + (PAD.l + i * bw + 1.5) + '" y="' + (base - hh) + '" width="' + Math.max(2, bw - 3) + '" height="' + hh + '" rx="2" class="' + (d.sleepH < 7 ? 'bar-low' : 'bar') + '"' +
+          tipAttr(PAD.l + i * bw + bw / 2, base - hh, [U.dayLetter(date) + ' ' + U.shortDate(date), 'Sommeil : ' + U.nf(d.sleepH) + ' h', s !== null ? 'Forme : ' + U.nf(s) + ' / 25' : '']) + '/>';
       }
       if (U.dow(date) === 1) bars += '<text x="' + (PAD.l + i * bw + bw / 2) + '" y="' + (h - 6) + '" class="axis" text-anchor="middle">' + U.shortDate(date) + '</text>';
     }
-    if (!any) return '<p class="muted">Le score apparaît dès que le check-in du matin est rempli.</p>';
-    var y25 = 8, y125 = base - (base - 8) / 2;
-    var axis = '<text x="' + (PAD.l - 6) + '" y="' + (y25 + 3) + '" class="axis" text-anchor="end">25</text>' +
-      '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y125 + '" y2="' + y125 + '" class="grid"/>' +
-      '<text x="' + (PAD.l - 6) + '" y="' + (y125 + 3) + '" class="axis" text-anchor="end">12,5</text>';
-    return box('<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart tip-chart" role="img" aria-label="Score de forme sur ' + days + ' jours">' + axis + bars + '</svg>');
+    var axis = [0, 7, hi].map(function (v) {
+      return '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="grid"/>' +
+        '<text x="' + (PAD.l - 6) + '" y="' + (y(v) + 3) + '" class="axis" text-anchor="end">' + v + ' h</text>';
+    }).join('');
+    return box('<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart tip-chart" role="img" aria-label="Heures de sommeil sur ' + days + ' jours">' + axis + bars + '</svg>');
   }
 
   function table(daily, end, days) {
@@ -5405,9 +5406,9 @@ Views.trends = (function () {
         (trend.delta === null ? '' : ', ' + U.signed(trend.delta, 2) + ' kg sur 7 jours (' + U.signed(trend.pct, 2) + ' %). ' + (status ? '<span class="' + status.key + '">' + status.text + '</span> (+0,25 à +0,5 %/sem.)' : ''))) + '</p>' +
       weightChart(daily, end, range) +
       '</section>' +
-      '<section class="card"><div class="card-head"><h2>Forme</h2><span class="muted small">28 derniers jours</span></div>' +
+      '<section class="card"><div class="card-head"><h2>Sommeil</h2><span class="muted small">28 derniers jours</span></div>' +
       '<p class="lead">Sommeil moyen 7 j : <b>' + (sleep7.length ? U.nf(Calc.mean(sleep7)) + ' h' : '–') + '</b></p>' +
-      readinessChart(daily, end, 28) + '</section>' +
+      sleepChart(daily, end, 28) + '<p class="muted small">Repère : 7 h. En dessous, la barre change de couleur.</p></section>' +
       progressCard(state) + volumeCard() + measuresCard() + Photos.card() +
       '<button class="btn ghost block all-data" data-all-data>' + App.icon('list') + 'Afficher toutes les données</button>';
   }
