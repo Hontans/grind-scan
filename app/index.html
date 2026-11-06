@@ -1063,7 +1063,12 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .stat { display: grid; gap: 2px; padding: 12px 13px; border-radius: 20px; background: var(--field); min-width: 0; }
 .stat b { font: 600 19px/1.15 var(--font); font-variant-numeric: tabular-nums; }
-.vol-row { display: grid; grid-template-columns: 92px 1fr 28px; gap: 10px; align-items: center; font-size: 13.5px; margin: 8px 0; }
+.vol-row { display: grid; grid-template-columns: 96px 1fr 30px 10px; gap: 10px; align-items: center; width: 100%; font-size: 13.5px; margin: 0; padding: 6px 0; text-align: left; color: inherit; border-radius: 10px; }
+.vol-row:active { background: var(--card-2); }
+.vol-go { color: var(--text-3); font-size: 16px; line-height: 1; }
+.body-map [data-muscle] { cursor: pointer; }
+.muscle-fig { display: block; width: 96px !important; height: 170px !important; margin: 0 auto 6px; }
+.sheet-h { font: 600 15px var(--font); margin: 16px 0 4px; }
 .vol-row b { text-align: right; font-variant-numeric: tabular-nums; }
 .vol-track { position: relative; height: 8px; border-radius: 8px; background: var(--field); overflow: hidden; }
 .vol-zone { position: absolute; top: 0; bottom: 0; background: color-mix(in srgb, var(--pos) 20%, transparent); }
@@ -1201,7 +1206,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:17 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:22 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5309,9 +5314,46 @@ Views.trends = (function () {
       Body.svg(vol) + (keys.length ? '' : '<p class="muted">Aucune série cette semaine : le mannequin se colore au fil des séances.</p>') +
       keys.map(function (k) {
         var v = vol[k];
-        return '<div class="vol-row"><span>' + U.esc(k) + '</span><div class="vol-track"><div class="vol-zone" style="left:' + (10 / max * 100) + '%;width:' + (10 / max * 100) + '%"></div>' +
-          '<div class="vol-fill' + (v < 10 ? ' low' : '') + '" style="width:' + (v / max * 100) + '%"></div></div><b>' + v + '</b></div>';
-      }).join('') + '<p class="muted small">Zone claire : 10 à 20 séries par semaine, la fourchette habituelle pour progresser.</p></section>';
+        return '<button class="vol-row" data-muscle-open="' + U.esc(k) + '"><span>' + U.esc(k) + '</span><div class="vol-track"><div class="vol-zone" style="left:' + (10 / max * 100) + '%;width:' + (10 / max * 100) + '%"></div>' +
+          '<div class="vol-fill' + (v < 10 ? ' low' : '') + '" style="width:' + Math.min(100, v / max * 100) + '%"></div></div><b>' + U.nf(v) + '</b><span class="vol-go">›</span></button>';
+      }).join('') + '<p class="muted small">Zone claire : 10 à 20 séries par semaine, la fourchette habituelle pour progresser. Touche un muscle pour voir ses exercices.</p></section>';
+  }
+
+  /** Feuille d'un muscle : séries de la semaine par exercice, puis les exercices du programme qui le font travailler. */
+  function openMuscle(app, muscle) {
+    var to = U.today(), from = U.addDays(to, -6), exs = Store.list('EXERCISES');
+    var role = function (name) { return Train.muscleOf(name, exs) === muscle ? 1 : Train.secondaryOf(name, exs).indexOf(muscle) >= 0 ? 0.5 : 0; };
+    var week = {}, total = 0;
+    Store.list('SETS').forEach(function (st) {
+      if (st.date < from || st.date > to || typeof st.reps !== 'number' || st.reps <= 0) return;
+      var r = role(st.exercise);
+      if (!r) return;
+      var w = week[st.exercise] = week[st.exercise] || { name: st.exercise, sets: 0, credit: 0, r: r };
+      w.sets++; w.credit += r; total += r;
+    });
+    var prog = {};
+    Store.list('PROGRAM').forEach(function (p) {
+      var r = role(p.exercise);
+      if (!r) return;
+      var e = prog[p.exercise] = prog[p.exercise] || { name: p.exercise, r: r, sessions: [] };
+      if (e.sessions.indexOf(p.session) < 0) e.sessions.push(p.session);
+    });
+    var tag = function (r) { return '<span class="chip' + (r === 1 ? ' accent' : '') + '">' + (r === 1 ? 'principal' : 'secondaire') + '</span>'; };
+    var byCredit = function (a, b) { return b.r - a.r || (b.credit || 0) - (a.credit || 0); };
+    var wk = Object.keys(week).map(function (k) { return week[k]; }).sort(byCredit);
+    var pg = Object.keys(prog).map(function (k) { return prog[k]; }).sort(byCredit);
+    app.openSheet({
+      title: muscle,
+      html: Body.mini([muscle]).replace('class="body-fig mini"', 'class="body-fig mini muscle-fig"') +
+        '<p class="muted small center">' + U.nf(total) + ' série' + (total > 1 ? 's' : '') + ' comptée' + (total > 1 ? 's' : '') + ' ces 7 derniers jours (un muscle secondaire compte pour une demi-série).</p>' +
+        '<h3 class="sheet-h">Cette semaine</h3>' + (wk.length ? '<ul class="list">' + wk.map(function (w) {
+          return '<li class="hist-row"><span class="entry-name">' + U.esc(w.name) + '</span><span class="muted small">' + w.sets + ' série' + (w.sets > 1 ? 's' : '') +
+            (w.r < 1 ? ' → ' + U.nf(w.credit) + ' comptée' + (w.credit > 1 ? 's' : '') : '') + ' ' + tag(w.r) + '</span></li>';
+        }).join('') + '</ul>' : '<p class="muted">Aucune série sur ce muscle ces 7 derniers jours.</p>') +
+        '<h3 class="sheet-h">Dans ton programme</h3>' + (pg.length ? '<ul class="list">' + pg.map(function (e) {
+          return '<li class="hist-row"><span class="entry-name">' + U.esc(e.name) + '</span><span class="muted small">' + e.sessions.map(U.esc).join(', ') + ' ' + tag(e.r) + '</span></li>';
+        }).join('') + '</ul>' : '<p class="muted">Aucun exercice du programme ne travaille ce muscle.</p>')
+    });
   }
 
   var MEASURE_FIELDS = [['waist', 'Tour de taille'], ['chest', 'Poitrine'], ['arm', 'Bras (contracté)'], ['thigh', 'Cuisse'], ['hips', 'Hanches']];
@@ -5387,6 +5429,8 @@ Views.trends = (function () {
     root.addEventListener('click', function (e) {
       if (e.target.closest('[data-measure]')) return openMeasure(app);
       if (e.target.closest('[data-all-data]')) return openData(app, state);
+      var mo = e.target.closest('[data-muscle-open]') || e.target.closest('.body-map [data-muscle]');
+      if (mo) return openMuscle(app, mo.getAttribute('data-muscle-open') || mo.getAttribute('data-muscle'));
       var mb = e.target.closest('[data-metric]');
       if (mb) {
         state.progMetric = mb.getAttribute('data-metric');
