@@ -1206,7 +1206,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:31 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:37 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2641,8 +2641,12 @@ var Train = (function () {
   // Exercices qui ciblent plusieurs groupes (tous principaux, une série compte pour chacun) :
   // les tirages et rowings répartis sur les muscles du dos, les dips sur triceps et pectoraux.
   // Pas de muscles « secondaires » : un développé ne compte pas pour les épaules ni les triceps.
+  // Seule la première règle qui correspond s'applique.
+  // Rowing prise large (coudes ouverts) : haut du dos, pas le grand dorsal. Autres rowings (prise serrée, neutre,
+  // poitrine appuyée, coudes le long du corps) : grand dorsal aussi.
   var ALSO = [
-    [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal', 'Grand rond']],
+    [/(rowing|row\b|tirage horizontal).*(large|coudes? (ouverts?|ecartes?))/, ['Grand rond']],
+    [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal']],
     [/tirage (vertical|haut)|traction|pulldown|pull ?over/, ['Grand rond']],
     [/dips/, ['Pectoraux']]
   ];
@@ -2671,8 +2675,20 @@ var Train = (function () {
     var d = declared(name, exercises);
     if (d && d.length) return d;
     var main = muscleOf(name, exercises), n = norm(name), out = main === 'Autre' ? [] : [main];
-    ALSO.forEach(function (r) {
-      if (r[0].test(n)) r[1].forEach(function (m) { if (out.indexOf(m) < 0) out.push(m); });
+    for (var i = 0; i < ALSO.length; i++) {
+      if (!ALSO[i][0].test(n)) continue;
+      ALSO[i][1].forEach(function (m) { if (out.indexOf(m) < 0) out.push(m); });
+      break;
+    }
+    return out;
+  }
+
+  /** Séries prévues par semaine pour un programme (chaque séance faite une fois par semaine) : { muscle: séries }. */
+  function programVolume(program, exercises) {
+    var out = {};
+    (program || []).forEach(function (p) {
+      var n = Number(p.sets) || 3, ms = musclesOf(p.exercise, exercises);
+      (ms.length ? ms : ['Autre']).forEach(function (m) { out[m] = (out[m] || 0) + n; });
     });
     return out;
   }
@@ -2690,7 +2706,7 @@ var Train = (function () {
   }
 
   return { range: range, e1rm: e1rm, last: last, suggest: suggest, warmup: warmup, best: best, history: history, progress: progress, exercisesDone: exercisesDone,
-    muscleOf: muscleOf, musclesOf: musclesOf, weeklyVolume: weeklyVolume, norm: norm };
+    muscleOf: muscleOf, musclesOf: musclesOf, programVolume: programVolume, weeklyVolume: weeklyVolume, norm: norm };
 })();
 </script>
 
@@ -5309,13 +5325,14 @@ Views.trends = (function () {
     return '<section class="card"><div class="card-head"><h2>Calories adaptatives</h2><span class="muted small">21 derniers jours</span></div>' + body + '</section>';
   }
 
+  /** Volume par muscle d'après le programme (c'est lui qui est appliqué chaque semaine). */
   function volumeCard() {
-    var to = U.today(), from = U.addDays(to, -6);
-    var vol = Train.weeklyVolume(Store.list('SETS'), from, to, Store.list('EXERCISES'));
+    var vol = Train.programVolume(Store.list('PROGRAM'), Store.list('EXERCISES'));
+    delete vol.Autre;
     var keys = Object.keys(vol).sort(function (a, b) { return vol[b] - vol[a]; });
     var max = Math.max(20, keys.length ? vol[keys[0]] : 0);
-    return '<section class="card"><div class="card-head"><h2>Volume par muscle</h2><span class="muted small">séries, 7 derniers jours</span></div>' +
-      Body.svg(vol) + (keys.length ? '' : '<p class="muted">Aucune série cette semaine : le mannequin se colore au fil des séances.</p>') +
+    return '<section class="card"><div class="card-head"><h2>Volume par muscle</h2><span class="muted small">séries par semaine, programme</span></div>' +
+      Body.svg(vol) + (keys.length ? '' : '<p class="muted">Importe le programme du coach pour colorer le mannequin.</p>') +
       keys.map(function (k) {
         var v = vol[k];
         return '<button class="vol-row" data-muscle-open="' + U.esc(k) + '"><span>' + U.esc(k) + '</span><div class="vol-track"><div class="vol-zone" style="left:' + (10 / max * 100) + '%;width:' + (10 / max * 100) + '%"></div>' +
@@ -5323,38 +5340,25 @@ Views.trends = (function () {
       }).join('') + '<p class="muted small">Zone claire : 10 à 20 séries par semaine, la fourchette habituelle pour progresser. Touche un muscle pour voir ses exercices.</p></section>';
   }
 
-  /** Feuille d'un muscle : séries de la semaine par exercice, puis les exercices du programme qui le font travailler. */
+  /** Feuille d'un muscle : les exercices du programme qui le font travailler, avec leurs séries par semaine. */
   function openMuscle(app, muscle) {
-    var to = U.today(), from = U.addDays(to, -6), exs = Store.list('EXERCISES');
-    var role = function (name) { return Train.musclesOf(name, exs).indexOf(muscle) >= 0 ? 1 : 0; };
-    var week = {}, total = 0;
-    Store.list('SETS').forEach(function (st) {
-      if (st.date < from || st.date > to || typeof st.reps !== 'number' || st.reps <= 0) return;
-      var r = role(st.exercise);
-      if (!r) return;
-      var w = week[st.exercise] = week[st.exercise] || { name: st.exercise, sets: 0, credit: 0, r: r };
-      w.sets++; w.credit += r; total += r;
-    });
-    var prog = {};
+    var exs = Store.list('EXERCISES'), by = {}, total = 0;
     Store.list('PROGRAM').forEach(function (p) {
-      var r = role(p.exercise);
-      if (!r) return;
-      var e = prog[p.exercise] = prog[p.exercise] || { name: p.exercise, r: r, sessions: [] };
+      var ms = Train.musclesOf(p.exercise, exs);
+      if (ms.indexOf(muscle) < 0) return;
+      var n = Number(p.sets) || 3;
+      var e = by[p.exercise] = by[p.exercise] || { name: p.exercise, sets: 0, sessions: [], also: ms.filter(function (m) { return m !== muscle; }) };
+      e.sets += n; total += n;
       if (e.sessions.indexOf(p.session) < 0) e.sessions.push(p.session);
     });
-    var also = function (name) { var o = Train.musclesOf(name, exs).filter(function (m) { return m !== muscle; }); return o.length ? ' · aussi ' + U.esc(o.join(', ')) : ''; };
-    var byCredit = function (a, b) { return b.r - a.r || (b.credit || 0) - (a.credit || 0); };
-    var wk = Object.keys(week).map(function (k) { return week[k]; }).sort(byCredit);
-    var pg = Object.keys(prog).map(function (k) { return prog[k]; }).sort(byCredit);
+    var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.sets - a.sets; });
     app.openSheet({
       title: muscle,
       html: Body.mini([muscle]).replace('class="body-fig mini"', 'class="body-fig mini muscle-fig"') +
-        '<p class="muted small center">' + U.nf(total) + ' série' + (total > 1 ? 's' : '') + ' comptée' + (total > 1 ? 's' : '') + ' ces 7 derniers jours.</p>' +
-        '<h3 class="sheet-h">Cette semaine</h3>' + (wk.length ? '<ul class="list">' + wk.map(function (w) {
-          return '<li class="hist-row"><span class="entry-name">' + U.esc(w.name) + '</span><span class="muted small">' + w.sets + ' série' + (w.sets > 1 ? 's' : '') + also(w.name) + '</span></li>';
-        }).join('') + '</ul>' : '<p class="muted">Aucune série sur ce muscle ces 7 derniers jours.</p>') +
-        '<h3 class="sheet-h">Dans ton programme</h3>' + (pg.length ? '<ul class="list">' + pg.map(function (e) {
-          return '<li class="hist-row"><span class="entry-name">' + U.esc(e.name) + '</span><span class="muted small">' + e.sessions.map(U.esc).join(', ') + also(e.name) + '</span></li>';
+        '<p class="muted small center">' + total + ' série' + (total > 1 ? 's' : '') + ' par semaine dans ton programme.</p>' +
+        (list.length ? '<ul class="list">' + list.map(function (e) {
+          return '<li class="hist-row"><span class="entry-name">' + U.esc(e.name) + '</span><span class="muted small">' + e.sets + ' série' + (e.sets > 1 ? 's' : '') + ' · ' +
+            e.sessions.map(U.esc).join(', ') + (e.also.length ? ' · aussi ' + U.esc(e.also.join(', ')) : '') + '</span></li>';
         }).join('') + '</ul>' : '<p class="muted">Aucun exercice du programme ne travaille ce muscle.</p>')
     });
   }
