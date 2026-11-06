@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Grind · Scanner</title>
+<!--
+  Scanner en direct de Grind, hors du cadre Google : dans la web app Apps Script, l'iPhone refuse la caméra
+  (le cadre de Google ne l'autorise pas). Cette page, ouverte par l'app dans un nouvel onglet, filme, lit le code
+  (BarcodeDetector, sinon zxing-cpp en WebAssembly, sinon ZXing JS) et le renvoie à l'app :
+  - message à l'onglet de l'app (window.opener) puis fermeture : l'app ouvre le produit sans recharger ;
+  - sinon retour à l'adresse de l'app avec ?scan=CODE.
+  Aucune donnée personnelle ici : la page ne reçoit que l'adresse de retour, le repas et deux couleurs.
+-->
+<style>
+  :root { --a: #4F7BFF; --b: #F25CB4; color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; font: 500 15px/1.4 -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+  video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .shade { position: fixed; inset: 0; pointer-events: none; }
+  .frame { position: fixed; left: 10%; right: 10%; top: 36%; height: 22%; border-radius: 22px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45), inset 0 0 0 2px rgba(255, 255, 255, .9); transition: box-shadow .2s; }
+  .frame::after { content: ''; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--a), var(--b)); box-shadow: 0 0 14px var(--b); animation: line 1.6s ease-in-out infinite alternate; }
+  .frame.ok { box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45), inset 0 0 0 3px #8BE3A8; }
+  @keyframes line { from { transform: translateY(-40px); } to { transform: translateY(40px); } }
+  .top, .bottom { position: fixed; left: 0; right: 0; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
+  .top { top: calc(env(safe-area-inset-top, 0px) + 12px); justify-content: space-between; }
+  .bottom { bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); flex-direction: column; }
+  .pill { height: 46px; padding: 0 18px; border: 0; border-radius: 999px; color: #fff; font: inherit; font-weight: 600;
+    background: rgba(30, 28, 40, .55); -webkit-backdrop-filter: blur(18px) saturate(170%); backdrop-filter: blur(18px) saturate(170%);
+    box-shadow: inset 0 0 0 .75px rgba(255, 255, 255, .35), 0 10px 24px -12px rgba(0, 0, 0, .7); }
+  .pill.on { background: linear-gradient(125deg, var(--a), var(--b)); }
+  .status { max-width: 360px; text-align: center; padding: 10px 16px; border-radius: 18px; background: rgba(30, 28, 40, .55); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 0 0 .75px rgba(255, 255, 255, .25); }
+  .manual { display: flex; gap: 8px; width: 100%; max-width: 420px; }
+  .manual input { flex: 1; min-width: 0; height: 46px; border: 0; border-radius: 16px; padding: 0 14px; font: 600 17px/1 inherit; color: #fff; outline: none;
+    background: rgba(30, 28, 40, .6); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: inset 0 0 0 .75px rgba(255, 255, 255, .3); }
+  .manual input::placeholder { color: rgba(255, 255, 255, .55); font-weight: 500; }
+  .go { background: linear-gradient(125deg, var(--a), var(--b)); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<video playsinline muted autoplay></video>
+<div class="frame" id="frame"></div>
+<div class="top">
+  <button class="pill" id="back">Annuler</button>
+  <button class="pill" id="torch" hidden>Lampe</button>
+</div>
+<div class="bottom">
+  <div class="status" id="status">Ouverture de la caméra…</div>
+  <div class="manual"><input id="code" inputmode="numeric" placeholder="Ou tape les chiffres du code"><button class="pill go" id="ok">OK</button></div>
+</div>
+<script>
+(function () {
+  var CDN = 'https://cdn.jsdelivr.net/npm/';
+  var q = new URLSearchParams(location.search);
+  var back = q.get('back') || '', meal = q.get('meal') || '', date = q.get('date') || '';
+  ['a', 'b'].forEach(function (k) { var v = q.get(k); if (/^#[0-9a-f]{6}$/i.test(v || '')) document.documentElement.style.setProperty('--' + k, v); });
+  var video = document.querySelector('video'), statusEl = document.getElementById('status'), frame = document.getElementById('frame');
+  var status = function (t) { statusEl.textContent = t; };
+  var stream = null, done = false;
+
+  function cleanCode(raw) {
+    var d = String(raw == null ? '' : raw).replace(/\D/g, '');
+    if (d.length === 12) d = '0' + d;
+    if (d.length !== 8 && d.length !== 13) return null;
+    var sum = 0;
+    for (var i = d.length - 2, k = 0; i >= 0; i--, k++) sum += Number(d[i]) * (k % 2 === 0 ? 3 : 1);
+    return (10 - sum % 10) % 10 === Number(d[d.length - 1]) ? d : null;
+  }
+
+  /** Retour à l'app : message à son onglet puis fermeture, sinon retour par l'adresse de l'app. */
+  function finish(code) {
+    if (done) return;
+    done = true;
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    var url = back ? back + (back.indexOf('?') < 0 ? '?' : '&') + 'scan=' + encodeURIComponent(code || '') + '&meal=' + encodeURIComponent(meal) + '&date=' + encodeURIComponent(date) : '';
+    var told = false;
+    try { if (window.opener && code) { window.opener.postMessage({ type: 'grind-scan', code: code, meal: meal, date: date }, '*'); told = true; } } catch (e) { told = false; }
+    if (told) {
+      window.close();
+      // fermeture refusée (onglet ouvert à la main) : on revient par l'adresse de l'app
+      setTimeout(function () { if (url) location.replace(url); else status('Code ' + code + ' envoyé à Grind : tu peux fermer cet onglet.'); }, 400);
+    } else if (url && code) location.replace(url);
+    else if (window.opener) window.close();
+    else if (back) location.replace(back);
+    else history.back();
+  }
+  function found(raw) {
+    var code = cleanCode(raw);
+    if (!code || done) return false;
+    frame.classList.add('ok');
+    status('Code ' + code);
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) { /* non supporté */ }
+    setTimeout(function () { finish(code); }, 250);
+    return true;
+  }
+
+  // ------------------------------------------------------------ moteurs (le plus fiable disponible)
+  function load(url, g) {
+    return new Promise(function (res, rej) {
+      if (window[g]) return res(window[g]);
+      var s = document.createElement('script'); s.src = url; s.async = true;
+      s.onload = function () { window[g] ? res(window[g]) : rej(new Error(g)); };
+      s.onerror = function () { rej(new Error(g)); };
+      document.head.appendChild(s);
+    });
+  }
+  function engine() {
+    try {
+      if ('BarcodeDetector' in window) {
+        var d = new window.BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+        return Promise.resolve(function (src) { return d.detect(src.video).then(function (c) { return c && c[0] ? c[0].rawValue : null; }); });
+      }
+    } catch (e) { /* pas de détecteur intégré */ }
+    return load(CDN + 'zxing-wasm@3.1.6/dist/iife/reader/index.js', 'ZXingWASM').then(function (W) {
+      return Promise.resolve(W.prepareZXingModule({ overrides: { locateFile: function (p) { return CDN + 'zxing-wasm@3.1.6/dist/reader/' + p; } }, fireImmediately: true })).then(function () {
+        return function (src) {
+          return W.readBarcodes(src.data(), { formats: ['EAN13', 'EAN8', 'UPCA', 'UPCE'], tryHarder: true, tryRotate: false, tryInvert: false, tryDownscale: true, maxNumberOfSymbols: 1 })
+            .then(function (r) { return r && r[0] ? r[0].text : null; });
+        };
+      });
+    }).catch(function () {
+      return load(CDN + '@zxing/library@0.21.3/umd/index.min.js', 'ZXing').then(function (Z) {
+        var h = new Map();
+        h.set(Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E]);
+        h.set(Z.DecodeHintType.TRY_HARDER, true);
+        var r = new Z.MultiFormatReader(); r.setHints(h);
+        return function (src) {
+          try { return Promise.resolve(r.decodeWithState(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(src.canvas())))).getText()); }
+          catch (e) { return Promise.resolve(null); } finally { r.reset(); }
+        };
+      });
+    });
+  }
+
+  // ------------------------------------------------------------ caméra
+  var grab = document.createElement('canvas'), g = grab.getContext('2d', { willReadFrequently: true });
+  function source() {
+    // la bande du cadre, un peu élargie, réduite à 1280 px au plus
+    var vw = video.videoWidth, vh = video.videoHeight, cw = vw * .9, ch = Math.min(vh, vw * .55);
+    var s = Math.min(1, 1280 / cw);
+    grab.width = Math.round(cw * s); grab.height = Math.round(ch * s);
+    g.drawImage(video, (vw - cw) / 2, (vh - ch) / 2, cw, ch, 0, 0, grab.width, grab.height);
+    return { video: video, canvas: function () { return grab; }, data: function () { return g.getImageData(0, 0, grab.width, grab.height); } };
+  }
+  function loop(read) {
+    if (done) return;
+    var p = video.readyState >= 2 && video.videoWidth ? read(source()).catch(function () { return null; }) : Promise.resolve(null);
+    p.then(function (c) { if (!(c && found(c))) setTimeout(function () { loop(read); }, 90); });
+  }
+  var reader = engine();
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+    stream = s;
+    video.srcObject = s;
+    var track = s.getVideoTracks()[0];
+    try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {}); } catch (e) { /* non supporté */ }
+    var caps = track.getCapabilities ? track.getCapabilities() : {};
+    if (caps.torch) {
+      var tb = document.getElementById('torch'), on = false;
+      tb.hidden = false;
+      tb.onclick = function () { on = !on; tb.classList.toggle('on', on); track.applyConstraints({ advanced: [{ torch: on }] }).catch(function () {}); };
+    }
+    return video.play().then(function () {
+      status('Vise le code-barre');
+      return reader.then(loop, function () { status('Lecteur non chargé (connexion ?) : tape les chiffres du code.'); });
+    });
+  }).catch(function () {
+    status('Caméra refusée : autorise-la pour ce site (Réglages › Safari › Appareil photo) ou tape les chiffres.');
+  });
+
+  document.getElementById('back').onclick = function () { finish(null); };
+  var manual = function () {
+    var v = document.getElementById('code').value;
+    if (!v.trim()) return status('Tape les chiffres sous le code-barre.');
+    if (!found(v)) status('Code invalide : vérifie les 8 ou 13 chiffres.');
+  };
+  document.getElementById('ok').onclick = manual;
+  document.getElementById('code').addEventListener('keydown', function (e) { if (e.key === 'Enter') manual(); });
+})();
+</script>
+</body>
+</html>
