@@ -1154,27 +1154,24 @@ table.data tbody tr { cursor: pointer; }
 .body-map figure { margin: 0; text-align: center; }
 .body-map figcaption { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .body-fig { width: 100%; max-height: 300px; height: auto; display: block; overflow: visible; }
-.body-fig .bm-sil { fill: var(--sil); }
-.body-fig .bm-s1 { stop-color: var(--text); stop-opacity: .13; }
-.body-fig .bm-s2 { stop-color: var(--text); stop-opacity: .05; }
+.body-fig, .body-legend { --bm-base: color-mix(in srgb, var(--text) 19%, var(--bg)); }
+.body-fig path { stroke: var(--bg); stroke-width: .8; stroke-linejoin: round; transition: fill .6s; }
+.body-fig .bm-base, .bm-0 { fill: var(--bm-base); }
+.bm-1 { fill: color-mix(in srgb, var(--accent) 34%, var(--bm-base)); }
+.bm-2 { fill: color-mix(in srgb, var(--accent) 58%, var(--bm-base)); }
+.bm-3 { fill: color-mix(in srgb, var(--accent) 82%, var(--bm-base)); }
+.bm-4 { fill: var(--accent); }
+.body-fig .bm-4 { filter: drop-shadow(0 0 2.5px var(--accent-glow)); }
 .body-fig .bm-g1 { stop-color: var(--accent-2, var(--accent)); }
 .body-fig .bm-g2 { stop-color: var(--accent); }
-.body-fig .bm { stroke: var(--bg); stroke-opacity: .5; stroke-width: .6; stroke-linejoin: round; transition: fill-opacity .6s; }
-.body-fig .bm-line { stroke: var(--bg); stroke-width: .8; stroke-linecap: round; fill: none; opacity: .45; }
-.bm-0 { fill: var(--text); fill-opacity: .1; }
-.bm-1, .bm-2, .bm-3, .bm-4 { fill: var(--accent); }
-.bm-1 { fill-opacity: .34; }
-.bm-2 { fill-opacity: .58; }
-.bm-3 { fill-opacity: .82; }
-.bm-4 { fill-opacity: 1; filter: drop-shadow(0 0 2.5px var(--accent-glow)); }
 .body-fig.mini { width: 100%; height: 100%; max-height: none; }
+.body-fig.mini path { stroke-width: 1.1; }
 .body-fig.mini .bm-4 { filter: drop-shadow(0 0 1.6px var(--accent-glow)); }
-.body-fig.mini .bm-0 { fill-opacity: .08; }
 .body-legend { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11.5px; color: var(--text-3); margin-bottom: 12px; }
 .body-legend span { margin: 0 4px; }
-.body-legend i { width: 18px; height: 8px; border-radius: 4px; background: var(--accent); }
-.body-legend i.bm-0 { background: var(--text); opacity: .14; }
-.body-legend i.bm-1 { opacity: .32; } .body-legend i.bm-2 { opacity: .55; } .body-legend i.bm-3 { opacity: .8; }
+.body-legend i { width: 18px; height: 8px; border-radius: 4px; }
+.body-legend i.bm-0 { background: var(--bm-base); } .body-legend i.bm-1 { background: color-mix(in srgb, var(--accent) 34%, var(--bm-base)); }
+.body-legend i.bm-2 { background: color-mix(in srgb, var(--accent) 58%, var(--bm-base)); } .body-legend i.bm-3 { background: color-mix(in srgb, var(--accent) 82%, var(--bm-base)); }
 .body-legend i.bm-4 { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 
 .photo-add { cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
@@ -1205,7 +1202,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 21:58 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 22:06 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3316,10 +3313,12 @@ Views.train = (function () {
     var existing = Store.list('SESSIONS').filter(function (s) { return s.date === date && s.name === name; })[0];
     return existing ? existing.id : 's-' + date + '-' + U.slug(name);
   }
+  /** Séries ajoutées ou retirées hors séance, par séance et par exercice (gardées sur le téléphone, reprises au démarrage). */
+  function planExtra() { return app.ls.get('planExtra', {}) || {}; }
   /** Séance pas encore lancée : mêmes cartes, la première série validée la démarre. */
   function preview(name) {
     var date = U.today();
-    return { session: name, date: date, sessionId: sessionIdFor(name, date), extra: {}, preview: true };
+    return { session: name, date: date, sessionId: sessionIdFor(name, date), extra: planExtra()[name] || {}, preview: true };
   }
 
   function pickerCard(name) {
@@ -3414,7 +3413,7 @@ Views.train = (function () {
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + prev.sets.map(fmtSet).join(' · ') + '</p>' : '<p class="muted small">Première fois sur cet exercice.</p>') +
       (sug ? '<p class="tip">' + U.esc(sug.text) + '</p>' : '') +
       '<div class="sets">' + rows + '</div>' +
-      '<div class="set-actions">' + ((w.extra[p.exercise] || 0) > 0 ? '<button class="btn ghost" data-less="' + idx + '">− Série</button>' : '') +
+      '<div class="set-actions">' + (n > 1 ? '<button class="btn ghost" data-less="' + idx + '">− Série</button>' : '') +
       '<button class="btn ghost" data-more="' + idx + '">+ Série</button></div>' +
       '</section>';
   }
@@ -3451,7 +3450,7 @@ Views.train = (function () {
 
   function start(name, quiet) {
     var date = U.today();
-    saveWorkout({ session: name, date: date, startedAt: Date.now(), sessionId: sessionIdFor(name, date), extra: {} });
+    saveWorkout({ session: name, date: date, startedAt: Date.now(), sessionId: sessionIdFor(name, date), extra: JSON.parse(JSON.stringify(planExtra()[name] || {})) });
     if (quiet) return workout();
     app.render({ dir: 'up' });
     app.scrollTo(0);
@@ -3566,6 +3565,34 @@ Views.train = (function () {
     });
   }
 
+  /**
+   * + / − une série. En séance : pour cette séance seulement. Hors séance : le programme affiché est ajusté
+   * (gardé pour les prochaines fois), sans démarrer la séance. Retirer la dernière série efface aussi ce qui y était validé.
+   */
+  function changeSets(root, idx, delta) {
+    var w = workout() || preview(picked());
+    var p = programFor(w.session)[idx];
+    var extra = w.extra[p.exercise] || 0;
+    if (delta < 0) {
+      var last = root.querySelectorAll('[data-row^="' + idx + '-"]').length;
+      if (last <= 1) return;
+      var gone = savedSet(w, p.exercise, last);
+      if (gone) Store.remove('SETS', gone.id);
+    }
+    if (w.preview) {
+      var all = planExtra(), m = all[w.session] = all[w.session] || {};
+      m[p.exercise] = extra + delta;
+      if (!m[p.exercise]) delete m[p.exercise];
+      app.ls.set('planExtra', all);
+    } else {
+      w.extra[p.exercise] = extra + delta;
+      saveWorkout(w);
+    }
+    var y = app.scrollY();
+    app.render();
+    app.scrollTo(y);
+  }
+
   function bind(root, st, a) {
     app = a; state = st;
     root.addEventListener('click', function (e) {
@@ -3576,25 +3603,8 @@ Views.train = (function () {
       if ((b = e.target.closest('[data-session]'))) return sessionDetail(b.getAttribute('data-session'));
       if ((b = e.target.closest('[data-pick]'))) { state.trainPick = b.getAttribute('data-pick'); app.render(); return; }
       if ((b = e.target.closest('[data-video]'))) return Videos.open(app, b.getAttribute('data-video'));
-      if ((b = e.target.closest('[data-less]'))) {
-        var wl = workout() || start(picked(), true);
-        var pl = programFor(wl.session)[Number(b.getAttribute('data-less'))];
-        var last = root.querySelectorAll('[data-row^="' + b.getAttribute('data-less') + '-"]').length;
-        var gone = savedSet(wl, pl.exercise, last);
-        if (gone) Store.remove('SETS', gone.id);
-        wl.extra[pl.exercise] = Math.max(0, (wl.extra[pl.exercise] || 0) - 1);
-        saveWorkout(wl);
-        app.render();
-        return;
-      }
-      if ((b = e.target.closest('[data-more]'))) {
-        var w = workout() || start(picked(), true);
-        var p = programFor(w.session)[Number(b.getAttribute('data-more'))];
-        w.extra[p.exercise] = (w.extra[p.exercise] || 0) + 1;
-        saveWorkout(w);
-        app.render();
-        return;
-      }
+      if ((b = e.target.closest('[data-less]'))) return changeSets(root, Number(b.getAttribute('data-less')), -1);
+      if ((b = e.target.closest('[data-more]'))) return changeSets(root, Number(b.getAttribute('data-more')), 1);
       if (e.target.closest('[data-finish]')) return finish();
       if (e.target.closest('[data-abort]')) {
         if (!window.confirm('Abandonner la séance ? Les séries déjà validées restent enregistrées.')) return;
@@ -4464,47 +4474,71 @@ var Scanner = (function () {
  * Mannequin face / dos coloré selon le volume de chaque muscle (séries par semaine), et sa version
  * miniature qui montre les muscles travaillés par un exercice.
  *
- * Dessin : chaque forme est une liste de points (moitié gauche, axe en x = 50, cadre 100 × 200) lissée en
- * courbe fermée (Catmull-Rom), puis reflétée pour l'autre côté. Modifier un muscle = déplacer ses points.
+ * Style « planche anatomique » : le corps entier est fait de segments (muscles, tête, mains, genoux, pieds)
+ * séparés par de fins espaces. Chaque segment est une liste de points (moitié gauche, axe en x = 50,
+ * cadre 100 × 200) lissée en courbe fermée (Catmull-Rom), puis reflétée pour l'autre côté.
+ * Modifier un muscle = déplacer ses points. Groupe « _ » = partie du corps sans muscle compté.
  * Les groupes viennent de Train.muscleOf / Train.secondaryOf.
  */
 var Body = (function () {
-  // Silhouette (moitié gauche, du haut du crâne à l'entrejambe) : tête, cou, épaule, bras, main, flanc, jambe, pied, jusqu'à l'entrejambe.
-  var SIL = [[50, 1.8], [45.2, 3.6], [42.6, 8.6], [42.6, 14], [44.4, 18.8], [46, 21.4], [45.4, 26.4], [38.5, 30.4], [30.5, 32.6], [25.2, 36.4], [22.6, 43.5], [21.6, 52], [20.3, 61.5],
-    [18.8, 71.5], [17.2, 82], [15.4, 88.5], [14.6, 95.5], [16.6, 99.6], [19.4, 96], [20.6, 89.5], [22.6, 82], [25, 72], [26.8, 62.5],
-    [28, 55], [29.6, 50.5], [31, 60], [31.8, 72], [31.4, 84], [30, 95], [29.4, 108], [30.4, 122], [32, 137], [32.4, 148], [31.6, 160],
-    [33, 175], [34.4, 185.5], [32.6, 192.5], [39.6, 195.2], [42.2, 190], [42.4, 180], [43, 165], [44, 150], [45.4, 135], [47.2, 118],
-    [50, 108.5]]; // dernier point : entrejambe, sur l'axe
+  /** Rectangle arrondi (case d'abdominaux). */
+  function rr(x1, y1, x2, y2) {
+    var r = Math.min(1.6, (x2 - x1) / 3, (y2 - y1) / 3);
+    return [[x1 + r, y1], [x2 - r, y1], [x2, y1 + r], [x2, y2 - r], [x2 - r, y2], [x1 + r, y2], [x1, y2 - r], [x1, y1 + r]];
+  }
+
+  // Tête entière (dessinée une fois, sans reflet ni couture).
+  var HEAD = [[50, 1.2], [44.8, 2.6], [42, 7.6], [41.8, 13.8], [43.2, 19.2], [46.2, 23], [50, 24.6]];
+  HEAD = HEAD.concat(HEAD.slice(1, -1).reverse().map(function (p) { return [100 - p[0], p[1]]; }));
+  var HAND = ['_', [[19.4, 99.8], [17.2, 103.6], [15, 109], [14.6, 114.6], [16.4, 117.6], [18.8, 115.6], [21.4, 110], [23, 104.4], [22.6, 100.6]]];
+  var FOREARM = [
+    ['Avant-bras', [[24.6, 73], [22, 79.2], [20, 87], [19, 94], [19.6, 99.6], [21.8, 98.4], [23.6, 89], [26, 80.8], [26.8, 75]]],
+    ['Avant-bras', [[28, 74.6], [27.2, 82], [24.8, 90.6], [22.8, 98.8], [24.2, 99.6], [27.4, 90.4], [29.6, 81.6], [29.6, 76.6]]]
+  ];
 
   var FRONT = [
-    ['Trapèzes', [[46.4, 25.6], [41.5, 29.6], [46.6, 30.4]]],
-    ['Épaules', [[31.6, 33.6], [26, 36.8], [23.4, 43.6], [24.4, 49.6], [27.8, 45.6], [31.6, 40.2], [34, 36]]],
-    ['Pectoraux', [[48.4, 35.8], [40.4, 34.4], [34.2, 37.4], [31.6, 43], [33.4, 48.8], [39.4, 51.8], [48.4, 50.8]]],
-    ['Biceps', [[27.4, 47.6], [24.4, 50.8], [23, 57.4], [23.4, 62], [25.8, 61], [27.4, 55]]],
-    ['Avant-bras', [[22.6, 64.6], [20, 72.4], [18.6, 81], [20.6, 81.6], [23, 73.4], [25.4, 65.8]]],
-    ['Abdos', [[48.8, 54], [43.6, 54.4], [43, 66], [43.4, 80], [44.8, 91.6], [48.8, 97.6]]],
-    ['Obliques', [[41.4, 55.2], [34.4, 56.4], [33.4, 68], [35, 81.6], [41, 89.6], [41.6, 72]]],
-    ['Quadriceps', [[32.4, 103.6], [31.8, 118], [33.2, 133.4], [37, 140.6], [41.8, 139], [44.8, 125], [45.8, 112.6], [41, 104.6]]],
-    ['Adducteurs', [[47.6, 110.6], [45.8, 118.4], [45, 126], [48.6, 115]]],
-    ['Mollets', [[33.8, 152], [33.2, 163.6], [35.2, 174], [38.2, 173.6], [39.6, 162], [38.2, 151.6]]]
+    ['_', [[46.2, 20.6], [45.4, 26.4], [46.8, 31.4], [50, 32.4], [50, 21]]],
+    ['Trapèzes', [[45.2, 26.4], [37.6, 31.4], [44, 32.6], [48.4, 31.6]]],
+    ['Épaules', [[35.6, 32.6], [28.6, 34], [24.4, 38.6], [22.8, 45.6], [23.6, 52.8], [26.8, 49.6], [30.8, 43.4], [35.6, 37.8], [38, 34.4]]],
+    ['Pectoraux', [[49.4, 35.4], [43, 33.8], [38.6, 35.6], [33.6, 41.4], [32.8, 47.6], [37, 52], [44, 53.4], [49.4, 51.8]]],
+    ['Biceps', [[28.6, 51.2], [25.4, 53.6], [23.6, 60], [23.6, 67.6], [24.8, 72.8], [27.6, 72], [29.4, 66.4], [29.8, 59.6]]],
+    ['Triceps', [[30.6, 55.4], [30.2, 63], [29, 70], [30.4, 70.2], [31.6, 62.6]]],
+    FOREARM[0], FOREARM[1], HAND,
+    ['Abdos', rr(44, 55.4, 49.4, 62.6)], ['Abdos', rr(44, 63.6, 49.4, 71)], ['Abdos', rr(44.2, 72, 49.4, 79.6)],
+    ['Abdos', [[44.4, 80.6], [49.4, 80.6], [49.4, 97.6], [47.4, 96], [45.2, 90], [44.4, 84]]],
+    ['Obliques', [[42.8, 55.8], [37.4, 54.6], [34.8, 58.6], [34, 68], [35.4, 80], [38.6, 90.4], [42.8, 95.4], [43.2, 82], [42.6, 68]]],
+    ['_', [[44.6, 96.8], [40.4, 96], [37.4, 99.2], [41.6, 103.6], [46.6, 109], [49.6, 110.4], [49.6, 99.4]]],
+    ['Quadriceps', [[34.6, 97], [31.4, 106], [30.4, 120], [31.4, 135], [35, 148.6], [37.8, 140.6], [37.2, 124], [36.6, 108], [37.4, 100]]],
+    ['Quadriceps', [[38.4, 101.4], [38, 116], [39.2, 134], [41, 147.4], [43.8, 140], [44.6, 124], [43.4, 110.4], [41, 104.4]]],
+    ['Quadriceps', [[44.8, 139], [42.4, 148.4], [44.6, 152.6], [47.4, 148.6], [47.4, 141.6]]],
+    ['Adducteurs', [[44, 108.4], [45.2, 120], [46.6, 133], [48.6, 122.4], [49.4, 113.2]]],
+    ['_', [[37.6, 151.6], [37, 157.4], [39.8, 161.4], [44, 160.2], [45.2, 155], [41.6, 151]]],
+    ['Mollets', [[35.6, 161.2], [33.4, 170.6], [34.6, 181.4], [37.4, 189.6], [39.4, 184], [39.6, 170], [38.6, 162.4]]],
+    ['Mollets', [[40.8, 163], [41, 175.4], [41.2, 189.6], [43.2, 190], [44.6, 176], [44.8, 164.2], [42.8, 161.6]]],
+    ['_', [[37.6, 190.6], [36.2, 195.4], [38, 198.6], [44.4, 198.6], [45, 193.6], [43.8, 190.6]]]
   ];
   var BACK = [
-    ['Trapèzes', [[50, 22.4], [45.4, 27.6], [36.4, 31.8], [42.4, 37.6], [50, 46.4]]],
-    ['Épaules', [[31.6, 33.6], [26, 36.8], [23.4, 43.6], [24.4, 49.6], [27.8, 45.6], [31.6, 40.2], [34.6, 35.6]]],
-    ['Rhomboïdes', [[49.4, 48.4], [43, 40.4], [40, 43.4], [41.2, 48.6], [46, 53.2], [49.4, 54.2]]],
-    ['Grand rond', [[34.6, 41.6], [30.6, 44.6], [30.8, 48.8], [34.4, 49], [37.4, 45.6]]],
-    ['Grand dorsal', [[38.6, 50.4], [32.8, 52.4], [32.2, 62], [34.2, 72], [40, 80], [47, 84], [49.4, 76], [49.4, 58.6], [45.6, 56], [41, 53]]],
-    ['Triceps', [[27.4, 47.6], [24.4, 50.8], [23, 57.4], [23.4, 62], [25.8, 61], [27.4, 55]]],
-    ['Avant-bras', [[22.6, 64.6], [20, 72.4], [18.6, 81], [20.6, 81.6], [23, 73.4], [25.4, 65.8]]],
-    ['Lombaires', [[49.4, 86.4], [44.2, 88.4], [43.2, 94], [49.4, 97]]],
-    ['Fessiers', [[49.4, 99.6], [40, 98.6], [32.4, 103.4], [31.8, 113], [37, 120], [45, 120.4], [49.4, 115]]],
-    ['Ischios', [[32.6, 123.4], [33, 135], [36, 142], [42, 142], [45.6, 132], [46.2, 122.6], [40, 121.6]]],
-    ['Mollets', [[33.2, 148.4], [32.2, 158], [34.6, 170], [38, 171], [41, 162], [40.6, 150.4], [37, 146.4]]]
+    ['Trapèzes', [[50, 22.6], [46.8, 25.4], [44.6, 29], [36.4, 32.4], [41.4, 36.2], [47.6, 37], [50, 39.6]]],
+    ['Épaules', [[35.6, 33], [28.6, 34], [24.4, 38.6], [22.8, 45.6], [23.6, 52.8], [26.8, 49], [31.4, 42.6], [36.4, 37.6]]],
+    ['Rhomboïdes', [[49.6, 41], [45.6, 38.4], [41.8, 38.6], [41, 43], [44.2, 50], [49.6, 54.8]]],
+    ['Grand rond', [[39.4, 38.8], [34.4, 39.4], [31.4, 43.6], [32, 48.6], [35.8, 50], [39.6, 46.4]]],
+    ['Grand dorsal', [[40.6, 48.4], [36.6, 51.6], [33.2, 54.6], [33.4, 63.6], [36, 73.6], [41, 81.6], [46.6, 86], [49.6, 83.4], [49.6, 60.4], [44.6, 55]]],
+    ['Triceps', [[28.6, 51], [25.2, 53.6], [23.4, 60.4], [23.4, 67.8], [24.8, 72.8], [27.6, 72], [29.4, 66.6], [29.8, 59]]],
+    ['Biceps', [[30.6, 55.4], [30.2, 63], [29, 70], [30.4, 70.2], [31.6, 62.6]]],
+    FOREARM[0], FOREARM[1], HAND,
+    ['Obliques', [[41.4, 84], [35.8, 77], [34.8, 87.4], [37.6, 95.4], [42, 95]]],
+    ['Lombaires', [[49.6, 86.8], [45.4, 88.8], [43, 92.4], [43.8, 97.6], [49.6, 99.6]]],
+    ['Fessiers', [[49.6, 100.4], [44, 98.8], [37.6, 99], [33, 103.6], [31.8, 113], [34.8, 121], [42, 124], [48, 122.4], [49.6, 118]]],
+    ['Ischios', [[33, 123.6], [31.8, 135], [33.6, 147], [37.4, 153], [40.2, 146], [40.4, 133], [38.8, 125]]],
+    ['Ischios', [[41.4, 126.2], [41.6, 138], [42.6, 149.6], [45, 152.6], [47, 145], [47.2, 133], [46, 126]]],
+    ['_', [[37.4, 154.6], [37.2, 159.4], [41, 161.6], [45, 159.6], [45.4, 154.8], [41.4, 153.6]]],
+    ['Mollets', [[35.4, 161.6], [33.4, 170], [34.8, 179.6], [38.2, 183.4], [40.6, 177], [40.4, 166], [38.6, 161.4]]],
+    ['Mollets', [[41.6, 162.8], [41.6, 172], [42.6, 180], [44.4, 182], [45.6, 174], [45.4, 165], [43.4, 161.6]]],
+    ['_', [[38.6, 184.6], [38.6, 190], [43.2, 190], [43.4, 183.6], [40.8, 182.8]]],
+    ['_', [[37.6, 191.4], [37, 196.6], [39.6, 198.6], [44, 198.4], [44.4, 192]]]
   ];
   // Groupe du mannequin → groupe compté (les obliques comptent avec les abdos).
   var ALIAS = { Obliques: 'Abdos' };
-  var ABS_LINES = 'M43.4,65.4 L48.8,65.4 M43.6,75.6 L48.8,75.6 M44.2,85.6 L48.8,85.6';
-  var BACK_LINES = 'M41.6,49 C44,51.6 46.6,53.4 49.4,54.2';
   var BACK_ONLY = ['Grand dorsal', 'Rhomboïdes', 'Grand rond', 'Trapèzes', 'Triceps', 'Lombaires', 'Fessiers', 'Ischios'];
 
   /** Courbe fermée lisse passant par les points (Catmull-Rom → Bézier). */
@@ -4518,10 +4552,21 @@ var Body = (function () {
     }
     return d + 'Z';
   }
-  // Silhouette entière d'un seul tenant (pas de couture au milieu) : moitié gauche puis son reflet.
-  var SIL_D = smooth(SIL.concat(SIL.slice(1, -1).reverse().map(function (p) { return [100 - p[0], p[1]]; })));
-  var paths = {};
-  function pathOf(z) { return paths[z[0] + z[1][0]] || (paths[z[0] + z[1][0]] = smooth(z[1])); }
+  /** Segment grossi de d (vers l'extérieur) : les voisins se touchent, la séparation est le trait du contour. */
+  function inflate(pts, d) {
+    var cx = 0, cy = 0, n = pts.length;
+    pts.forEach(function (p) { cx += p[0] / n; cy += p[1] / n; });
+    return pts.map(function (p, i) {
+      var a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+      var nx = b[1] - a[1], ny = a[0] - b[0], l = Math.sqrt(nx * nx + ny * ny) || 1;
+      if (nx * (p[0] - cx) + ny * (p[1] - cy) < 0) { nx = -nx; ny = -ny; }
+      return [p[0] + nx / l * d, p[1] + ny / l * d];
+    });
+  }
+  var GROW = 1.1;
+  /** Tracé d'un segment, calculé une fois. */
+  function pathOf(z) { return z.d || (z.d = smooth(inflate(z[1], GROW))); }
+  var HEAD_D = smooth(inflate(HEAD, GROW));
 
   /** Niveau de couleur (0 à 4) selon les séries de la semaine. */
   function level(n) {
@@ -4529,18 +4574,19 @@ var Body = (function () {
     return n < 5 ? 1 : n < 10 ? 2 : n < 15 ? 3 : 4;
   }
 
+  /** Segments pleins (couleurs opaques) cernés d'un trait couleur du fond : le dernier peint recouvre le trait du voisin. */
   var uid = 0;
-  function figure(zones, levelOf, label, deco, cls) {
+  function figure(zones, levelOf, label, cls) {
     var id = 'bm' + (++uid);
-    var shapes = zones.map(function (z) {
+    var mirror = function (h) { return '<g>' + h + '</g><g transform="matrix(-1 0 0 1 100 0)">' + h + '</g>'; };
+    var half = zones.map(function (z) {
+      if (z[0] === '_') return '<path d="' + pathOf(z) + '" class="bm-base"/>';
       var g = ALIAS[z[0]] || z[0], lv = levelOf(g);
-      return '<path d="' + pathOf(z) + '" class="bm bm-' + lv.l + '" data-muscle="' + g + '"' + (lv.l ? ' fill="url(#' + id + 'g)"' : '') + '>' + (lv.t ? '<title>' + lv.t + '</title>' : '') + '</path>';
+      return '<path d="' + pathOf(z) + '" class="bm bm-' + lv.l + '" data-muscle="' + g + '"' + (lv.l === 4 ? ' fill="url(#' + id + 'g)"' : '') + '>' + (lv.t ? '<title>' + lv.t + '</title>' : '') + '</path>';
     }).join('');
-    var half = shapes + (deco ? '<path d="' + deco + '" class="bm-line"/>' : '');
-    return '<svg viewBox="8 0 84 200" class="body-fig ' + (cls || '') + '" role="img" aria-label="' + label + '">' +
-      '<defs><radialGradient id="' + id + 'g" cx="50%" cy="38%" r="70%"><stop offset="0" class="bm-g1"/><stop offset="1" class="bm-g2"/></radialGradient>' +
-      '<linearGradient id="' + id + 's" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="bm-s1"/><stop offset="1" class="bm-s2"/></linearGradient></defs>' +
-      '<g class="bm-body" style="--sil:url(#' + id + 's)"><path d="' + SIL_D + '" class="bm-sil"/><g>' + half + '</g><g transform="matrix(-1 0 0 1 100 0)">' + half + '</g></g></svg>';
+    return '<svg viewBox="10 0 80 200" class="body-fig ' + (cls || '') + '" role="img" aria-label="' + label + '">' +
+      '<defs><radialGradient id="' + id + 'g" cx="50%" cy="38%" r="70%"><stop offset="0" class="bm-g1"/><stop offset="1" class="bm-g2"/></radialGradient></defs>' +
+      '<g class="bm-body">' + mirror(half) + '<path d="' + HEAD_D + '" class="bm-base"/></g></svg>';
   }
 
   /** Les deux faces côte à côte. vol = { Pectoraux: 12, 'Grand dorsal': 9, … } */
@@ -4548,8 +4594,8 @@ var Body = (function () {
     vol = vol || {};
     var lv = function (g) { var n = vol[g] || 0; return { l: level(n), t: g + ' : ' + String(n).replace('.', ',') + ' série' + (n > 1 ? 's' : '') }; };
     return '<div class="body-map">' +
-      '<figure>' + figure(FRONT, lv, 'Face', ABS_LINES) + '<figcaption>Face</figcaption></figure>' +
-      '<figure>' + figure(BACK, lv, 'Dos', BACK_LINES) + '<figcaption>Dos</figcaption></figure></div>' +
+      '<figure>' + figure(FRONT, lv, 'Face') + '<figcaption>Face</figcaption></figure>' +
+      '<figure>' + figure(BACK, lv, 'Dos') + '<figcaption>Dos</figcaption></figure></div>' +
       '<div class="body-legend"><span>0</span><i class="bm-0"></i><i class="bm-1"></i><i class="bm-2"></i><i class="bm-3"></i><i class="bm-4"></i><span>15+ séries</span></div>';
   }
 
@@ -4562,7 +4608,7 @@ var Body = (function () {
     var front = muscles.length - back;
     var useBack = back > front || (back === front && back > 0);
     var lv = function (g) { return { l: muscles.indexOf(g) >= 0 ? 4 : secondary.indexOf(g) >= 0 ? 2 : 0, t: '' }; };
-    return figure(useBack ? BACK : FRONT, lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.concat(secondary).join(', '), useBack ? BACK_LINES : ABS_LINES, 'mini');
+    return figure(useBack ? BACK : FRONT, lv, (useBack ? 'Dos' : 'Face') + ' : ' + muscles.concat(secondary).join(', '), 'mini');
   }
 
   return { svg: svg, mini: mini, level: level };
