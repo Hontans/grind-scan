@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Grind">
   <meta name="robots" content="noindex">
   <title>Grind</title>
@@ -214,6 +214,19 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+}
+/* page agrandie à la taille de l'écran (voir fitViewport) : le body sert de repère aux éléments fixés */
+html.vfix, html.vfix body { height: var(--app-h); }
+html.vfix body { transform: translateZ(0); }
+/* paysage sur téléphone : écran qui demande de remettre le téléphone droit */
+.rotate-lock { display: none; }
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) {
+  .rotate-lock {
+    display: grid; place-items: center; position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg); color: var(--text); text-align: center; font: 500 16px/1.4 var(--font);
+  }
+  .rotate-lock p { margin: 14px 0 0; color: var(--text-2); }
+  #app { visibility: hidden; }
 }
 #scroll {
   position: fixed; left: 0; top: 0; right: 0; bottom: 0;
@@ -656,7 +669,8 @@ html:not(.gl) .backdrop { z-index: 33; }
 @keyframes fadein { from { opacity: 0; } }
 .sheet {
   position: fixed; left: 8px; right: 8px; bottom: max(8px, calc(var(--sab) - 16px)); z-index: 34;
-  max-height: calc(100vh - var(--sat) - 10px - var(--head-h) - var(--glass-gap) - 10px); overflow-y: auto; overscroll-behavior: none;
+  /* sous l'en-tête avec assez d'écart pour que leurs verres ne fusionnent pas */
+  max-height: calc(var(--app-h, 100vh) - var(--sat) - 10px - var(--head-h) - var(--glass-gap) - 12px - max(8px, calc(var(--sab) - 16px))); overflow-y: auto; overscroll-behavior: none;
   margin: 0 auto; max-width: 544px;
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -1206,7 +1220,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 22:46 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 23:09 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -6152,20 +6166,40 @@ window.Views = Views;
     }
     e.preventDefault();
   }, { passive: false });
-  // Icône sur l'écran d'accueil avec barre d'état transparente : l'app occupe tout l'écran, mais le cadre
-  // de Google ne reçoit pas toujours la marge de la barre d'état (env(safe-area-inset-top) à 0).
-  function fixTopInset() {
+  // Taille réelle de l'écran utilisable (--app-h) et marge de la barre d'état (--sat).
+  // Icône d'accueil, barre d'état transparente : l'app doit couvrir tout l'écran, barre d'état comprise.
+  // Certains iPhone donnent pourtant à la page la hauteur de l'écran moins la barre d'état (bande vide en bas) :
+  // on agrandit alors la page à la taille de l'écran (html.vfix), et le body devient le repère des éléments fixés.
+  // Le cadre de Google, lui, ne reçoit pas toujours la marge de la barre d'état (env(safe-area-inset-top) à 0).
+  function fitViewport() {
+    var root = document.documentElement, st = root.style;
     var probe = document.createElement('div');
     probe.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none';
     document.body.appendChild(probe);
     var env = probe.getBoundingClientRect().height;
     probe.parentNode.removeChild(probe);
-    var full = window.innerHeight >= (window.screen && screen.height || 1e9) - 1 && window.innerWidth < 600;
-    if (env > 0 || !full) document.documentElement.style.removeProperty('--sat');
-    else document.documentElement.style.setProperty('--sat', (screen.height >= 852 ? 59 : 47) + 'px');
+    var sh = window.screen && screen.height || 0, ih = window.innerHeight, portrait = ih > window.innerWidth;
+    var phone = window.innerWidth < 600 && portrait && sh > 0;
+    var short = phone && window.navigator.standalone === true && sh - ih >= 20 && sh - ih <= 70;
+    root.classList.toggle('vfix', short);
+    st.setProperty('--app-h', (short ? sh : ih) + 'px');
+    var full = short || (phone && ih >= sh - 1);
+    if (env > 0 || !full) st.removeProperty('--sat');
+    else st.setProperty('--sat', (short ? sh - ih : sh >= 852 ? 59 : 47) + 'px');
   }
-  fixTopInset();
-  window.addEventListener('resize', fixTopInset);
+  fitViewport();
+  window.addEventListener('resize', fitViewport);
+  window.addEventListener('orientationchange', function () { setTimeout(fitViewport, 300); });
+  // Pas de mode paysage : bloqué là où le navigateur le permet (Android), sinon un écran demande de tourner le téléphone.
+  try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function () {}); } catch (e) { /* non pris en charge */ }
+  (function () {
+    var rot = document.createElement('div');
+    rot.className = 'rotate-lock';
+    rot.setAttribute('aria-hidden', 'true');
+    rot.innerHTML = '<div><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><p>Grind s\u2019utilise en portrait.<br>Remets ton téléphone droit.</p></div>';
+    document.body.appendChild(rot);
+  })();
 
   // Clavier refermé : l'iPhone laisse parfois la page décalée.
   document.addEventListener('focusout', function () {
