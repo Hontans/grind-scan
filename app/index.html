@@ -13,7 +13,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" type="image/png" href="icon-180.png">
-  <meta name="theme-color" content="#08080E">
+  <meta name="theme-color" content="#07080B">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Inter:wght@500;600&display=swap" rel="stylesheet">
@@ -31,7 +31,7 @@
   --font: 'Google Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: var(--font);
 
-  --bg: #0A0910;
+  --bg: #07080B;
   --veil: rgba(8, 7, 13, .7);
 
   --card: rgba(14, 12, 22, .4);
@@ -39,7 +39,7 @@
   --card-2: rgba(255, 255, 255, .06);
   --solid: #15131D;
   --card-glow: inset 0 0 20px rgba(255, 255, 255, .03);
-  --rim: conic-gradient(from 212deg at 50% 50%, rgba(255, 255, 255, .72), rgba(196, 178, 255, .2) 16%, rgba(130, 220, 255, .1) 32%, rgba(255, 255, 255, .07) 50%, rgba(255, 176, 224, .14) 66%, rgba(255, 255, 255, .44) 84%, rgba(255, 255, 255, .72));
+  --rim: conic-gradient(from 212deg at 50% 50%, rgba(255, 255, 255, .42), rgba(255, 255, 255, .12) 16%, rgba(255, 255, 255, .05) 32%, rgba(255, 255, 255, .04) 50%, rgba(255, 255, 255, .1) 66%, rgba(255, 255, 255, .26) 84%, rgba(255, 255, 255, .42));
   --lift: 0 18px 36px -26px rgba(0, 0, 0, .85);
   --field: rgba(255, 255, 255, .08);
   --field-hover: rgba(255, 255, 255, .13);
@@ -64,14 +64,14 @@
   --text-2: rgba(255, 255, 255, .68);
   --text-3: rgba(255, 255, 255, .46);
 
-  --accent: #6D4AFF;
-  --accent-grad: linear-gradient(180deg, rgba(133, 104, 255, .94) 0%, rgba(99, 64, 245, .94) 100%);
+  --accent: #4D8DFF;
+  --accent-grad: linear-gradient(180deg, #5E98FF, #4D8DFF);
   --on-accent: #FFFFFF;
-  --accent-ink: #BDAEFF;
-  --accent-soft: rgba(138, 110, 255, .2);
-  --accent-line: rgba(170, 150, 255, .55);
-  --accent-glow: rgba(109, 74, 255, .55);
-  --accent-shadow: inset 0 0 0 .75px rgba(255, 255, 255, .34), inset 0 0 12px rgba(255, 255, 255, .2), inset 2px 0 2px -2px rgba(255, 110, 190, .8), inset -2px 0 2px -2px rgba(110, 210, 255, .8), 0 12px 24px -12px var(--accent-glow);
+  --accent-ink: #94BBFF;
+  --accent-soft: rgba(77, 141, 255, .16);
+  --accent-line: rgba(113, 164, 255, .5);
+  --accent-glow: rgba(77, 141, 255, .45);
+  --accent-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .22), inset 0 1px 0 rgba(255, 255, 255, .2), 0 0 0 .5px rgba(77, 141, 255, .5), 0 4px 18px -6px rgba(77, 141, 255, .5);
 
   --pos: #8BE3A8;
   --neg: #FF9C92;
@@ -110,15 +110,15 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #E8E6EF;
+    --bg: #E2E5EC;
     --veil: rgba(236, 234, 243, .72);
     --card: rgba(255, 255, 255, .6);
-    --card-base: #EEEDF4;
+    --card-base: #EEF0F4;
     --card-2: rgba(40, 30, 90, .05);
     --solid: #FFFFFF;
     --card-glow: inset 0 0 14px rgba(255, 255, 255, .75);
-    --rim: conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .75) 16%, rgba(200, 235, 255, .7) 32%, rgba(255, 255, 255, .6) 50%, rgba(255, 215, 240, .75) 66%, rgba(255, 255, 255, .92) 84%, #fff);
-    --lift: 0 16px 32px -24px rgba(50, 40, 100, .42);
+    --rim: conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .75) 16%, rgba(255, 255, 255, .55) 32%, rgba(255, 255, 255, .6) 50%, rgba(255, 255, 255, .7) 66%, rgba(255, 255, 255, .92) 84%, #fff);
+    --lift: 0 16px 30px -20px rgba(20, 30, 60, .32), 0 1px 2px rgba(20, 30, 60, .06);
     --field: rgba(44, 36, 90, .07);
     --field-hover: rgba(44, 36, 90, .11);
     --field-shadow: inset 0 0 0 .5px rgba(44, 36, 90, .05);
@@ -138,8 +138,8 @@
     --text: #100F18;
     --text-2: rgba(16, 15, 24, .64);
     --text-3: rgba(16, 15, 24, .44);
-    --accent: #6440F5;
-    --accent-grad: linear-gradient(180deg, rgba(120, 90, 255, .96) 0%, rgba(90, 54, 236, .96) 100%);
+    --accent: #3E7BEB;
+    --accent-grad: linear-gradient(180deg, #4E86EE, #3E7BEB);
     --on-accent: #FFFFFF;
     --accent-ink: #5635E0;
     --accent-soft: rgba(100, 64, 245, .13);
@@ -155,15 +155,15 @@
   }
 }
 :root[data-theme="light"] {
-  --bg: #E8E6EF;
+  --bg: #E2E5EC;
   --veil: rgba(236, 234, 243, .72);
   --card: rgba(255, 255, 255, .6);
-  --card-base: #EEEDF4;
+  --card-base: #EEF0F4;
   --card-2: rgba(40, 30, 90, .05);
   --solid: #FFFFFF;
   --card-glow: inset 0 0 14px rgba(255, 255, 255, .75);
-  --rim: conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .75) 16%, rgba(200, 235, 255, .7) 32%, rgba(255, 255, 255, .6) 50%, rgba(255, 215, 240, .75) 66%, rgba(255, 255, 255, .92) 84%, #fff);
-  --lift: 0 16px 32px -24px rgba(50, 40, 100, .42);
+  --rim: conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .75) 16%, rgba(255, 255, 255, .55) 32%, rgba(255, 255, 255, .6) 50%, rgba(255, 255, 255, .7) 66%, rgba(255, 255, 255, .92) 84%, #fff);
+  --lift: 0 16px 30px -20px rgba(20, 30, 60, .32), 0 1px 2px rgba(20, 30, 60, .06);
   --field: rgba(44, 36, 90, .07);
   --field-hover: rgba(44, 36, 90, .11);
   --field-shadow: inset 0 0 0 .5px rgba(44, 36, 90, .05);
@@ -183,8 +183,8 @@
   --text: #100F18;
   --text-2: rgba(16, 15, 24, .64);
   --text-3: rgba(16, 15, 24, .44);
-  --accent: #6440F5;
-  --accent-grad: linear-gradient(180deg, rgba(120, 90, 255, .96) 0%, rgba(90, 54, 236, .96) 100%);
+  --accent: #3E7BEB;
+  --accent-grad: linear-gradient(180deg, #4E86EE, #3E7BEB);
   --on-accent: #FFFFFF;
   --accent-ink: #5635E0;
   --accent-soft: rgba(100, 64, 245, .13);
@@ -434,9 +434,9 @@ svg { display: block; }
   white-space: nowrap;
 }
 .btn:active:not(:disabled) { transform: scale(1.02, .92); transition: transform .16s var(--ease-out), box-shadow .2s; }
-/* le violet : un verre teinté, seul accent de l'interface */
+/* l'accent : une couleur unie, seul accent de l'interface, avec une légère lueur néon */
 .btn.primary { background: var(--accent-grad); color: var(--on-accent); box-shadow: var(--accent-shadow); }
-.btn.primary::after { background: linear-gradient(160deg, rgba(255, 255, 255, .7), rgba(255, 255, 255, .14) 34%, transparent 58%, rgba(255, 255, 255, .28)); }
+.btn.primary::after { background: linear-gradient(180deg, rgba(255, 255, 255, .34), rgba(255, 255, 255, .06) 45%, rgba(255, 255, 255, .1)); }
 .btn.secondary { background: var(--field); color: var(--text); box-shadow: var(--field-shadow); }
 .btn.secondary:hover { background: var(--field-hover); }
 .btn.ghost { background: transparent; color: var(--text-2); }
@@ -1139,7 +1139,7 @@ table.data tbody tr { cursor: pointer; }
   box-shadow: inset 0 0 0 .75px rgba(255, 255, 255, .5), inset 0 0 12px rgba(255, 255, 255, .25), 0 8px 18px -10px rgba(0, 0, 0, .6);
   transition: box-shadow .3s var(--ease-out);
 }
-.swatch i::after { content: ''; position: absolute; inset: 7px; border-radius: inherit; background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, .7), transparent 42%); opacity: .55; }
+.swatch i::after { content: ''; position: absolute; inset: 7px; border-radius: inherit; background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, .7), transparent 42%); opacity: .2; }
 .swatch[aria-pressed="true"] { color: var(--text); }
 .swatch[aria-pressed="true"] i { box-shadow: 0 0 0 2.5px var(--bg), 0 0 0 4.5px var(--text), 0 8px 18px -10px rgba(0, 0, 0, .6); animation: pop .8s var(--liquid); }
 .settings-sec { margin: 20px 2px 10px; font-size: 13px; font-weight: 600; color: var(--text-2); }
@@ -1231,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 23:24 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-06 23:53 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1312,24 +1312,22 @@ table.data tbody tr { cursor: pointer; }
   <script>
 /*
  * Thèmes de couleurs : la teinte des boutons accentués, des graphiques et du verre, et le fond généré
- * (dégradés flous et rubans de lumière) que le verre réfracte. Aucune photo : le fond est dessiné
+ * (noir profond, lueurs diffuses et tubes de néon) que le verre réfracte. Aucune photo : le fond est dessiné
  * au démarrage à partir des couleurs du thème, puis gardé en cache sur le téléphone.
  */
 var Themes = (function () {
-  // a : couleur principale, b : seconde couleur (dégradé des boutons), c : troisième couleur du fond.
+  // Une seule couleur d'accent par thème (a), plus une teinte voisine (c) qui ne sert qu'aux lueurs du fond.
+  // Pas de dégradé entre deux couleurs : boutons unis, la lumière vient du fond et du verre.
   var LIST = [
-    { id: 'bleu-rose', name: 'Bleu et rose', a: '#4F7BFF', b: '#F25CB4', c: '#8A5CFF' },
-    { id: 'ocean', name: 'Océan', a: '#2F8CFF', b: '#22D3C5', c: '#3B4BFF' },
-    { id: 'aurore', name: 'Aurore', a: '#22C49A', b: '#8A63FF', c: '#2F8CFF' },
-    { id: 'sunset', name: 'Coucher de soleil', a: '#FF7A45', b: '#F2508F', c: '#FFB547' },
-    { id: 'framboise', name: 'Framboise', a: '#F2508F', b: '#FF8A65', c: '#B04BFF' },
-    { id: 'lavande', name: 'Lavande', a: '#7B5CFF', b: '#7B5CFF', c: '#4F7BFF' },
-    { id: 'menthe', name: 'Menthe', a: '#1FBF8F', b: '#1FBF8F', c: '#1E9BD7' },
-    { id: 'ambre', name: 'Ambre', a: '#F0A030', b: '#F0A030', c: '#F06A3A' },
-    { id: 'glacier', name: 'Glacier', a: '#5B9BFF', b: '#5B9BFF', c: '#8FD3FF' },
-    { id: 'graphite', name: 'Graphite', a: '#8C93A8', b: '#C4C9D6', c: '#5B6478' }
+    { id: 'electrique', name: 'Bleu électrique', a: '#4D8DFF', c: '#5B6CFF' },
+    { id: 'cyan', name: 'Cyan', a: '#2FC6E8', c: '#2F86FF' },
+    { id: 'violet', name: 'Violet', a: '#8D6CFF', c: '#5873FF' },
+    { id: 'vert', name: 'Vert néon', a: '#35D49A', c: '#25B5C8' },
+    { id: 'ambre', name: 'Ambre', a: '#FFB03D', c: '#FF7A3D' },
+    { id: 'rouge', name: 'Rouge', a: '#FF4F61', c: '#FF7448' },
+    { id: 'graphite', name: 'Graphite', a: '#B9BFCB', c: '#7D8899' }
   ];
-  var DEFAULT = 'bleu-rose';
+  var DEFAULT = 'electrique';
 
   function get(id) { return LIST.filter(function (t) { return t.id === id; })[0] || LIST[0]; }
 
@@ -1342,33 +1340,36 @@ var Themes = (function () {
 
   /** Variables CSS d'un thème pour le mode 'dark' ou 'light'. */
   function vars(t, mode) {
-    var a = rgb(t.a), b = rgb(t.b), c = rgb(t.c), light = mode === 'light';
-    var a1 = light ? mix(a, BLACK, .08) : a, b1 = light ? mix(b, BLACK, .08) : b;
-    var mid = mix(a1, b1, .5);
-    var onAccent = lum(mid) > .62 ? '#14121C' : '#FFFFFF';
-    var ink = light ? mix(a, BLACK, lum(a) > .55 ? .45 : .22) : mix(a, WHITE, .5);
-    var ink2 = light ? mix(b, BLACK, lum(b) > .55 ? .45 : .22) : mix(b, WHITE, .5);
+    var a = rgb(t.a), light = mode === 'light';
+    var a1 = light ? mix(a, BLACK, lum(a) > .55 ? .3 : .1) : a;
+    var onAccent = lum(a1) > .6 ? '#0B0D12' : '#FFFFFF';
+    var ink = light ? mix(a, BLACK, lum(a) > .55 ? .5 : .25) : mix(a, WHITE, .4);
     return {
       '--accent': hexOf(a1),
-      '--accent-2': hexOf(b1),
-      '--accent-grad': 'linear-gradient(125deg, ' + rgba(mix(a1, WHITE, .1), .95) + ' 0%, ' + rgba(b1, .95) + ' 100%)',
+      '--accent-2': hexOf(a1),
+      // uni : à peine plus clair en haut, comme un bouton éclairé par-dessus, pas un dégradé de couleurs
+      '--accent-grad': 'linear-gradient(180deg, ' + hexOf(mix(a1, WHITE, .07)) + ', ' + hexOf(a1) + ')',
       '--on-accent': onAccent,
       '--accent-ink': hexOf(ink),
-      '--accent-ink-2': hexOf(ink2),
-      '--accent-soft': rgba(a, light ? .13 : .2),
-      '--accent-line': light ? rgba(a, .38) : rgba(mix(a, WHITE, .3), .55),
-      '--accent-glow': rgba(mid, light ? .4 : .55),
-      '--bg': light ? hexOf(mix([234, 236, 243], c, .06)) : hexOf(mix([8, 8, 14], c, .05)),
+      '--accent-ink-2': hexOf(ink),
+      '--accent-soft': rgba(a, light ? .12 : .16),
+      '--accent-line': light ? rgba(a1, .4) : rgba(mix(a, WHITE, .2), .5),
+      '--accent-glow': rgba(a, light ? .3 : .45),
+      '--accent-shadow': light
+        ? 'inset 0 0 0 .5px rgba(255, 255, 255, .3), inset 0 1px 0 rgba(255, 255, 255, .25), 0 6px 16px -8px ' + rgba(a1, .55)
+        : 'inset 0 0 0 .5px rgba(255, 255, 255, .22), inset 0 1px 0 rgba(255, 255, 255, .2), 0 0 0 .5px ' + rgba(a, .5) + ', 0 4px 18px -6px ' + rgba(a, .5),
+      '--bg': light ? '#E2E5EC' : '#07080B',
+      // liseré du verre : blanc seulement, un soupçon de l'accent sur un côté
       '--rim': light
-        ? 'conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .75) 16%, ' + rgba(mix(b, WHITE, .75), .75) + ' 32%, rgba(255, 255, 255, .6) 50%, ' + rgba(mix(a, WHITE, .75), .75) + ' 66%, rgba(255, 255, 255, .92) 84%, #fff)'
-        : 'conic-gradient(from 212deg at 50% 50%, rgba(255, 255, 255, .72), ' + rgba(mix(a, WHITE, .55), .22) + ' 16%, ' + rgba(mix(c, WHITE, .5), .1) + ' 32%, rgba(255, 255, 255, .07) 50%, ' + rgba(mix(b, WHITE, .55), .16) + ' 66%, rgba(255, 255, 255, .44) 84%, rgba(255, 255, 255, .72))'
+        ? 'conic-gradient(from 212deg at 50% 50%, #fff, rgba(255, 255, 255, .85) 14%, rgba(28, 36, 60, .1) 32%, rgba(28, 36, 60, .16) 48%, ' + rgba(a1, .35) + ' 66%, rgba(255, 255, 255, .9) 84%, #fff)'
+        : 'conic-gradient(from 212deg at 50% 50%, rgba(255, 255, 255, .42), rgba(255, 255, 255, .12) 16%, rgba(255, 255, 255, .05) 32%, rgba(255, 255, 255, .04) 50%, ' + rgba(a, .14) + ' 66%, rgba(255, 255, 255, .26) 84%, rgba(255, 255, 255, .42))'
     };
   }
 
   /** Teintes du verre accentué pour le moteur (rvb 0..1) : [sombre, clair]. */
   function glassTint(t) {
-    var m = mix(rgb(t.a), rgb(t.b), .35);
-    return [m.map(function (v) { return v / 255; }), mix(m, BLACK, .08).map(function (v) { return v / 255; })];
+    var m = rgb(t.a);
+    return [m.map(function (v) { return v / 255; }), mix(m, BLACK, .1).map(function (v) { return v / 255; })];
   }
 
   // ---------------------------------------------------------------- fond généré
@@ -1380,83 +1381,87 @@ var Themes = (function () {
   }
 
   /**
-   * Image de fond (dataURL jpeg) : grandes nappes de couleur floues, rubans de lumière et halos,
-   * puis un grain léger qui évite les marches dans les dégradés. Format portrait de téléphone.
+   * Image de fond (dataURL jpeg) : un noir presque neutre, deux lueurs très diffuses de la couleur du thème
+   * et deux fins tubes de néon courbes, qui donnent au verre quelque chose à réfracter sans charger l'écran.
+   * Un vignetage et un grain léger (évite les marches dans les dégradés). Format portrait de téléphone.
    */
   function background(t, mode) {
     var W = 720, H = 1560, light = mode === 'light';
     var cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     var g = cv.getContext('2d', { willReadFrequently: true });
-    var a = rgb(t.a), b = rgb(t.b), c = rgb(t.c), R = rand(t.id + mode);
-    var tone = function (col) { return light ? mix(col, WHITE, .35) : mix(col, BLACK, .04); };
+    var a = rgb(t.a), c = rgb(t.c), R = rand(t.id + mode);
+    var base = light ? [226, 229, 236] : [7, 8, 11];
 
-    g.fillStyle = light ? hexOf(mix([236, 238, 245], c, .08)) : hexOf(mix([7, 7, 12], c, .06));
+    g.fillStyle = hexOf(base);
     g.fillRect(0, 0, W, H);
 
-    var blob = function (x, y, r, col, alpha) {
-      var gr = g.createRadialGradient(x, y, 0, x, y, r);
+    var pool = function (x, y, rx, ry, col, alpha) {
+      g.save();
+      g.translate(x, y); g.scale(1, ry / rx);
+      var gr = g.createRadialGradient(0, 0, 0, 0, 0, rx);
       gr.addColorStop(0, rgba(col, alpha));
-      gr.addColorStop(.45, rgba(col, alpha * .55));
+      gr.addColorStop(.35, rgba(col, alpha * .55));
+      gr.addColorStop(.7, rgba(col, alpha * .15));
       gr.addColorStop(1, rgba(col, 0));
       g.fillStyle = gr;
-      g.fillRect(x - r, y - r, r * 2, r * 2);
-    };
-    var k = light ? .85 : 1;
-    // nappes principales : la première couleur en haut, la seconde au milieu, la troisième et la première en bas
-    blob(W * .1, H * .08, W * 1.05, tone(a), .9 * k);
-    blob(W * 1.0, H * .3, W * .85, tone(c), .6 * k);
-    blob(W * .05, H * .55, W * .9, tone(b), .82 * k);
-    blob(W * .95, H * .72, W * .75, tone(b), .5 * k);
-    blob(W * .55, H * 1.0, W * 1.0, tone(a), .75 * k);
-
-    // rubans de lumière en diagonale : un trait épais dont on ne garde que l'ombre floue
-    var ribbon = function (y0, y1, amp, col, width, alpha) {
-      var o = W * 3;
-      g.save();
-      g.shadowColor = rgba(col, alpha);
-      g.shadowBlur = width * 1.2;
-      g.shadowOffsetX = o;
-      g.strokeStyle = '#000';
-      g.lineWidth = width;
-      g.lineCap = 'round';
-      g.beginPath();
-      g.moveTo(-W * .25 - o, y0);
-      g.bezierCurveTo(W * .25 - o, y0 - amp, W * .7 - o, y1 + amp, W * 1.25 - o, y1);
-      g.stroke();
+      g.fillRect(-rx, -rx, rx * 2, rx * 2);
       g.restore();
     };
-    ribbon(H * (.3 + R() * .04), H * (.06 + R() * .04), H * .1, mix(a, WHITE, .3), 54, light ? .55 : .75);
-    ribbon(H * (.62 + R() * .04), H * (.36 + R() * .04), -H * .08, mix(b, WHITE, .25), 80, light ? .5 : .7);
-    ribbon(H * (.9 + R() * .03), H * (.66 + R() * .04), H * .08, mix(c, WHITE, .3), 44, light ? .5 : .65);
-    ribbon(H * (.47 + R() * .04), H * (.24 + R() * .04), H * .05, WHITE, 10, light ? .7 : .35);
+    var k = light ? .9 : 1;
+    // lueurs : une en haut à droite (sous l'en-tête), une plus discrète en bas à gauche (sous les onglets)
+    pool(W * .92, H * .04, W * 1.0, H * .3, a, .42 * k);
+    pool(W * .08, H * .97, W * .95, H * .24, c, .3 * k);
 
-    // halos : des bulles de lumière que le verre déforme
-    for (var i = 0; i < 18; i++) {
-      var x = R() * W, y = R() * H, r = 24 + R() * 90, col = [a, b, c][i % 3];
-      blob(x, y, r, mix(col, WHITE, light ? .45 : .35), (light ? .45 : .42) * (.5 + R() * .5));
-    }
+    // tubes de néon : un trait net et clair, sa lueur proche et un halo large, qui s'allument et s'éteignent le long de la courbe
+    var neon = function (pts, col, alpha) {
+      var grad = function (al, core) {
+        var gr = g.createLinearGradient(pts[0], pts[1], pts[6], pts[7]);
+        var cc = core ? (light ? mix(col, BLACK, .08) : mix(col, WHITE, .55)) : col;
+        gr.addColorStop(0, rgba(cc, 0));
+        gr.addColorStop(.3, rgba(cc, al));
+        gr.addColorStop(.7, rgba(cc, al));
+        gr.addColorStop(1, rgba(cc, 0));
+        return gr;
+      };
+      var pass = function (width, blur, al, core) {
+        g.save();
+        g.lineCap = 'round';
+        g.lineWidth = width;
+        g.strokeStyle = grad(al, core);
+        if (blur) { g.shadowColor = rgba(col, light ? .75 : .9); g.shadowBlur = blur; }
+        g.beginPath();
+        g.moveTo(pts[0], pts[1]);
+        g.bezierCurveTo(pts[2], pts[3], pts[4], pts[5], pts[6], pts[7]);
+        g.stroke();
+        g.restore();
+      };
+      pass(26, 60, alpha * .1, false);   // halo
+      pass(6, 18, alpha * .35, false);   // lueur
+      pass(2.2, 6, alpha, true);         // tube
+    };
+    var j1 = R() * .03, j2 = R() * .03;
+    neon([-W * .1, H * (.2 + j1), W * .35, H * .05, W * .75, H * .26, W * 1.1, H * (.1 + j1)], a, light ? .85 : .75);
+    neon([W * 1.1, H * (.84 + j2), W * .7, H * 1.0, W * .3, H * .8, -W * .1, H * (.97 + j2)], mix(a, c, .5), light ? .75 : .7);
 
-    // voile qui calme le centre de l'écran, où se trouve le texte
-    var v = g.createLinearGradient(0, 0, 0, H);
-    var base = light ? [240, 241, 247] : [6, 6, 11];
-    v.addColorStop(0, rgba(base, light ? .05 : .05));
-    v.addColorStop(.45, rgba(base, light ? .2 : .22));
-    v.addColorStop(1, rgba(base, light ? .08 : .12));
+    // vignetage : les bords plongent dans le noir, le centre reste calme pour le texte
+    var v = g.createRadialGradient(W * .5, H * .45, W * .2, W * .5, H * .5, H * .75);
+    v.addColorStop(0, rgba(base, 0));
+    v.addColorStop(1, rgba(light ? [196, 201, 212] : base, light ? .45 : .6));
     g.fillStyle = v;
     g.fillRect(0, 0, W, H);
 
     var d = g.getImageData(0, 0, W, H), p = d.data;
-    for (var j = 0; j < p.length; j += 4) {
-      var n = (R() - .5) * 7;
-      p[j] += n; p[j + 1] += n; p[j + 2] += n;
+    for (var i = 0; i < p.length; i += 4) {
+      var n = (R() - .5) * 6;
+      p[i] += n; p[i + 1] += n; p[i + 2] += n;
     }
     g.putImageData(d, 0, 0);
     return cv.toDataURL('image/jpeg', .9);
   }
 
   /** Fond en cache sur le téléphone (un seul : celui affiché), sinon dessiné. */
-  var CACHE = 'grind:bg:v1';
+  var CACHE = 'grind:bg:v2';
   function cachedBackground(t, mode) {
     var key = t.id + ':' + mode;
     try {
@@ -1530,7 +1535,7 @@ window.Liquid = (function () {
   function makeFrost(img, name) {
     // 110 points de large et un rayon de 4 : équivalent d'un blur(16px) sur la photo affichée sur un téléphone.
     var c = blurred(img, 110, 4), g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height), p = d.data, i;
-    var tint = name === 'light' ? [255, 255, 255] : [14, 12, 22], a = name === 'light' ? .6 : .4, sat = 1.65;
+    var tint = name === 'light' ? [255, 255, 255] : [14, 12, 22], a = name === 'light' ? .42 : .4, sat = 1.2;
     for (i = 0; i < p.length; i += 4) {
       var l = p[i] * .2126 + p[i + 1] * .7152 + p[i + 2] * .0722;
       p[i] = (l + (p[i] - l) * sat) * (1 - a) + tint[0] * a;
@@ -1638,7 +1643,7 @@ window.Liquid = (function () {
     '  mB /= sum; mC /= sum; ctr /= sum;',
 
     '  float aa = .8 / uDpr;',
-    '  float shadow = exp(-max(d, 0.) / 9.) * mix(.26, .17, light) * (1. - mB.w * .6);',
+    '  float shadow = exp(-max(d, 0.) / 9.) * mix(.26, .24, light) * (1. - mB.w * .6);',
     '  if (d > aa) { gl_FragColor = vec4(0., 0., 0., shadow); return; }',
 
     // Normale de la surface : l'épaisseur du verre est un dôme le long du bord.
@@ -1670,7 +1675,7 @@ window.Liquid = (function () {
     // Irisation : l'arc-en-ciel discret le long des bords, comme dans un prisme.
     '  float ph = depth * .07 + dot(n, vec2(.42, .9)) * .22 + p.x * .0035 - p.y * .0018;',
     '  vec3 iri = .5 + .5 * cos(6.2832 * (ph + vec3(0., .33, .67)));',
-    '  c += (iri - .5) * smoothstep(11., .5, depth) * mix(.085, .17, light);',
+    '  c += (iri - .5) * smoothstep(11., .5, depth) * mix(.085, .11, light);',
 
     // Lueur intérieure, puis liseré net : plus vif du côté de la lumière, il renaît sur le bord opposé.
     '  vec2 L = normalize(vec2(-.55, .83));',
@@ -1679,6 +1684,8 @@ window.Liquid = (function () {
     '  c += exp(-depth / mix(4., 7., light)) * mix(.13, .3, light) * lit * (1. - mB.z * .7);',
     '  float rim = smoothstep(1.5, .35, abs(depth - .75));',
     '  c = mix(c, vec3(1.), rim * lit * mix(.86, 1., light));',
+    // en clair, un filet sombre juste sous le liseré blanc : sans lui, le bord se perd dans un fond clair
+    '  c *= 1. - light * .16 * smoothstep(5.5, 1.8, depth) * smoothstep(.9, 1.8, depth);',
 
     // Pastille active : une petite lentille à l'intérieur de la capsule.
     '  if (uLensM.y > 0.) {',
@@ -1850,7 +1857,7 @@ window.Liquid = (function () {
   // ---------------------------------------------------------------- matières par thème
 
   var INK_D = [9 / 255, 8 / 255, 15 / 255], WHITE = [1, 1, 1];
-  var VIOLET_D = [109 / 255, 74 / 255, 255 / 255], VIOLET_L = [100 / 255, 64 / 255, 245 / 255];
+  var VIOLET_D = [77 / 255, 141 / 255, 255 / 255], VIOLET_L = [62 / 255, 120 / 255, 230 / 255]; // remplacés par le thème
   var RED = [.72, .2, .17];
   var MAT = {
     dark: {
@@ -1864,10 +1871,10 @@ window.Liquid = (function () {
       error:  { frost: .5, tint: RED, a: .82 }
     },
     light: {
-      nav:    { frost: .72, tint: WHITE, a: .3 },
-      head:   { frost: .8, tint: WHITE, a: .2 },
-      circle: { frost: .72, tint: WHITE, a: .14 },
-      dock:   { frost: .85, tint: WHITE, a: .5 },
+      nav:    { frost: .3, tint: WHITE, a: .2 },
+      head:   { frost: .42, tint: WHITE, a: .16 },
+      circle: { frost: .3, tint: WHITE, a: .1 },
+      dock:   { frost: .6, tint: WHITE, a: .42 },
       toast:  { frost: .9, tint: WHITE, a: .62 },
       sheet:  { frost: 1, tint: WHITE, a: .8 },
       accent: { frost: .5, tint: VIOLET_L, a: .84 },
@@ -4395,7 +4402,7 @@ var Scanner = (function () {
   function externalUrl(ctx) {
     var L = launch(), t = window.Themes ? Themes.get((App.ls.get('look', null) || {}).theme) : null;
     return L.scanUrl + '?back=' + encodeURIComponent(L.appUrl || '') + '&meal=' + encodeURIComponent(ctx.meal || '') +
-      '&date=' + encodeURIComponent(ctx.date || '') + (t ? '&a=' + encodeURIComponent(t.a) + '&b=' + encodeURIComponent(t.b) : '');
+      '&date=' + encodeURIComponent(ctx.date || '') + (t ? '&a=' + encodeURIComponent(t.a) + '&b=' + encodeURIComponent(t.a) : '');
   }
   /** À appeler pendant un toucher (sinon l'iPhone bloque l'ouverture de l'onglet). */
   function openExternal(onCode, ctx) {
@@ -6092,7 +6099,7 @@ window.Views = Views;
       return '<button data-mode="' + m[0] + '" aria-pressed="' + (look.mode === m[0]) + '">' + m[1] + '</button>';
     }).join('') + '</div>' +
       '<div class="settings-sec">Couleurs</div><div class="swatches">' + Themes.LIST.map(function (t) {
-        var sw = t.a === t.b ? 'radial-gradient(circle at 30% 25%, ' + t.c + ', ' + t.a + ' 70%)' : 'linear-gradient(135deg, ' + t.a + ', ' + t.b + ')';
+        var sw = t.a;
         return '<button class="swatch" data-theme-id="' + t.id + '" aria-pressed="' + (look.theme === t.id) + '"><i style="--sw:' + sw + '"></i>' + U.esc(t.name) + '</button>';
       }).join('') + '</div>' +
       '<p class="muted small" style="margin-top:18px">Le fond et le verre prennent les couleurs du thème. Réglage gardé sur ce téléphone.</p>' +
