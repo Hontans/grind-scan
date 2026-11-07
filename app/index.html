@@ -1283,7 +1283,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 14:45 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 15:02 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1326,7 +1326,11 @@ table.data tbody tr { cursor: pointer; }
       if (ko) ko(new Error(msg));
     };
     if (!cfg.api || !cfg.key) { fail('App pas encore reliée au Sheet', true); return; }
-    fetch(cfg.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: cfg.key, fn: fn, args: args }) })
+    var body = JSON.stringify({ key: cfg.key, fn: fn, args: args });
+    // Envoi lancé au verrouillage : keepalive le laisse finir même si iOS suspend la page (limite 64 Ko).
+    // S'il échoue quand même, la file reste sur le téléphone et repart au retour.
+    var keep = fn === 'api_sync' && document.hidden && body.length < 20000;
+    fetch(cfg.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, keepalive: keep })
       .then(function (r) { return r.json(); })
       .then(function (res) { if (res && res.ok) { if (ok) ok(res.result); } else fail(res && res.error || 'Erreur du serveur', res && res.auth); })
       .catch(function () { fail(navigator.onLine === false ? 'pas de réseau' : 'le script ne répond pas (déploiement : Moi / Tout le monde, nouvelle version ; lance testerApp dans l\'éditeur)'); });
@@ -2879,7 +2883,18 @@ var Train = (function () {
     return out;
   }
 
-  return { range: range, e1rm: e1rm, last: last, suggest: suggest, warmup: warmup, best: best, history: history, progress: progress, exercisesDone: exercisesDone,
+  /**
+   * Séance en cours oubliée (jamais « Terminée ») : plus aucune série depuis 5 h. Sans cette limite, la reprendre
+   * la semaine suivante écrirait les nouvelles séries à l'ancienne date, par-dessus les anciennes.
+   * Une séance continuée après minuit reste la même (dernière série il y a quelques minutes).
+   */
+  var STALE_MS = 5 * 3600000;
+  function staleWorkout(w, now) {
+    if (!w) return false;
+    return now - (w.lastAt || w.startedAt || 0) > STALE_MS;
+  }
+
+  return { range: range, staleWorkout: staleWorkout, e1rm: e1rm, last: last, suggest: suggest, warmup: warmup, best: best, history: history, progress: progress, exercisesDone: exercisesDone,
     muscleOf: muscleOf, musclesOf: musclesOf, programVolume: programVolume, weeklyVolume: weeklyVolume, norm: norm };
 })();
 </script>
@@ -3486,7 +3501,24 @@ var Views = window.Views || {};
 Views.train = (function () {
   var app, state;
 
-  function workout() { return app.ls.get('workout', null); }
+  /** Séance en cours. Une séance oubliée (jamais terminée, plus de série depuis 5 h) est close ici, avec sa durée. */
+  function workout() {
+    var w = app.ls.get('workout', null);
+    if (!w || !Train.staleWorkout(w, Date.now())) return w;
+    app.ls.set('workout', null);
+    app.ls.set('setDraft', null);
+    var sess = Store.get('SESSIONS', w.sessionId), end = w.lastAt || w.startedAt;
+    if (sess && sess.durationMin == null && end > w.startedAt) Store.put('SESSIONS', Object.assign({}, sess, { durationMin: Math.max(1, Math.round((end - w.startedAt) / 60000)) }));
+    setTimeout(function () { app.toast('Séance ' + w.session + ' du ' + U.shortDate(w.date) + ' close (pas terminée)'); }, 600);
+    return null;
+  }
+  /** Séries tapées mais pas encore validées (✓) : gardées sur le téléphone si l'app est coupée entre-temps. */
+  function drafts(w) { var d = app.ls.get('setDraft', null); return d && d.sessionId === w.sessionId ? d.rows || {} : {}; }
+  function setDraft(w, exercise, n, val) {
+    var rows = drafts(w), k = exercise + '|' + n;
+    if (val) rows[k] = val; else delete rows[k];
+    app.ls.set('setDraft', { sessionId: w.sessionId, rows: rows });
+  }
   function saveWorkout(w) { app.ls.set('workout', w); }
   function sets() { return Store.list('SETS'); }
   function programFor(name) {
@@ -3606,16 +3638,16 @@ Views.train = (function () {
     var sug = Train.suggest(prev, p.reps);
     var planned = Number(p.sets) || (prev ? prev.sets.length : 3);
     var n = Math.max(planned + (w.extra[p.exercise] || 0), 1);
-    var rows = '';
+    var rows = '', draft = drafts(w);
     for (var i = 1; i <= n; i++) {
-      var saved = savedSet(w, p.exercise, i);
+      var saved = savedSet(w, p.exercise, i), dr = !saved && draft[p.exercise + '|' + i] || {};
       var lastSet = prev && prev.sets.filter(function (s) { return s.setNo === i; })[0];
       var phLoad = sug ? sug.load : (lastSet && lastSet.load);
       var phReps = sug && sug.reps ? sug.reps : (lastSet && lastSet.reps);
       rows += '<div class="set-row' + (saved ? ' done' : '') + '" data-row="' + idx + '-' + i + '">' +
         '<span class="set-n">' + i + '</span>' +
-        '<span class="field-box"><input inputmode="numeric" data-reps placeholder="' + (phReps == null ? 'reps' : U.nf(phReps, 0)) + '" value="' + (saved && saved.reps != null ? saved.reps : '') + '"><span class="unit">reps</span></span>' +
-        '<span class="field-box"><input inputmode="decimal" data-load placeholder="' + (phLoad == null ? 'kg' : String(phLoad).replace('.', ',')) + '" value="' + (saved && saved.load != null ? String(saved.load).replace('.', ',') : '') + '"><span class="unit">kg</span></span>' +
+        '<span class="field-box"><input inputmode="numeric" data-reps placeholder="' + (phReps == null ? 'reps' : U.nf(phReps, 0)) + '" value="' + (saved && saved.reps != null ? saved.reps : U.esc(dr.reps || '')) + '"><span class="unit">reps</span></span>' +
+        '<span class="field-box"><input inputmode="decimal" data-load placeholder="' + (phLoad == null ? 'kg' : String(phLoad).replace('.', ',')) + '" value="' + (saved && saved.load != null ? String(saved.load).replace('.', ',') : U.esc(dr.load || '')) + '"><span class="unit">kg</span></span>' +
         '<button class="check" data-check="' + idx + '-' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
     }
     var targets = Train.musclesOf(p.exercise, Store.list('EXERCISES')), muscle = targets.join(' + ') || 'Autre';
@@ -3683,6 +3715,7 @@ Views.train = (function () {
     var load = U.parseNum(loadEl.value || loadEl.placeholder);
     if (reps === null) { app.toast('Indique le nombre de reps'); repsEl.focus(); return; }
     var id = setId(w, p.exercise, n), was = savedSet(w, p.exercise, n);
+    setDraft(w, p.exercise, n, null);
     if (was && was.reps === reps && was.load === load) { // série déjà validée, rien de changé : on la dévalide
       Store.remove('SETS', was.id);
       repsEl.value = ''; loadEl.value = '';
@@ -3694,6 +3727,8 @@ Views.train = (function () {
       return;
     }
     if (w.preview) { w = start(w.session, true); started = true; } // première série validée : la séance démarre
+    w.lastAt = Date.now();
+    saveWorkout(w);
     var before = Train.best(sets(), p.exercise, id);
     Store.put('SETS', { id: id, date: w.date, sessionId: w.sessionId, session: w.session, exercise: p.exercise, setNo: n, reps: reps, load: load });
     // La séance existe dès sa première série : comptée dans Aujourd'hui et le bilan même sans « Terminer ».
@@ -3734,6 +3769,7 @@ Views.train = (function () {
           Store.put('SESSIONS', Object.assign({}, existing, { id: w.sessionId, date: w.date, name: w.session,
             durationMin: U.parseNum(p.querySelector('[data-min]').value), rpe: rpe, note: p.querySelector('[data-note]').value.trim() || existing.note || null }));
           app.ls.set('workout', null);
+          app.ls.set('setDraft', null);
           app.stopTimer();
           Store.flush();
           app.closeSheet();
@@ -3827,10 +3863,26 @@ Views.train = (function () {
       if (e.target.closest('[data-abort]')) {
         if (!window.confirm('Abandonner la séance ? Les séries déjà validées restent enregistrées.')) return;
         app.ls.set('workout', null);
+        app.ls.set('setDraft', null);
         app.stopTimer();
         app.render({ dir: 'down' });
       }
     });
+    // Saisie pas encore validée : gardée au cas où le téléphone coupe l'app avant le ✓.
+    root.addEventListener('input', function (e) {
+      var row = e.target.closest('[data-row]');
+      if (!row) return;
+      var w = workout() || preview(picked()), parts = row.getAttribute('data-row').split('-'), p = programFor(w.session)[Number(parts[0])];
+      if (!p) return;
+      var r = row.querySelector('[data-reps]').value, l = row.querySelector('[data-load]').value;
+      setDraft(w, p.exercise, Number(parts[1]), r || l ? { reps: r, load: l } : null);
+    });
+    // App rouverte après un verrouillage (iOS l'a déchargée) : on revient où on en était dans la séance.
+    if (!restored) {
+      restored = true;
+      var pos = app.ls.get('trainScroll', null), w0 = workout();
+      if (w0 && pos && pos.sessionId === w0.sessionId && pos.y > 0) setTimeout(function () { app.scrollTo(pos.y); }, 0);
+    }
     // Entrée sur le champ charge = valider la série.
     root.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter') return;
@@ -3839,7 +3891,13 @@ Views.train = (function () {
     });
   }
 
-  return { render: render, header: header, bind: bind, headAction: headAction };
+  var restored = false;
+  /** Position dans la séance, gardée quand l'app passe en arrière-plan (verrouillage). */
+  function remember() {
+    var w = app && state && state.tab === 'train' && workout();
+    if (w) app.ls.set('trainScroll', { sessionId: w.sessionId, y: app.scrollY() });
+  }
+  return { render: render, header: header, bind: bind, headAction: headAction, remember: remember };
 })();
 
 window.Views = Views;
@@ -5965,6 +6023,26 @@ window.Views = Views;
     placeFrost(frosted);
     renderNav(restart);
     renderDock();
+    keepAwake();
+  }
+
+  // ---------------------------------------------------------------- écran allumé pendant la séance
+
+  function liveWorkout() { var w = LS.get('workout', null); return !!w && !Train.staleWorkout(w, Date.now()); }
+  // iOS met en pause toute app web dès que l'écran se verrouille (rien ne peut l'empêcher) et peut la recharger au retour.
+  // Pendant une séance, on garde donc l'écran allumé : il ne se verrouille plus tout seul entre deux séries.
+  // (Verrouillage manuel : tout est déjà gardé sur le téléphone et la séance reprend où elle en était.)
+  var wakeLock = null, wakeAsking = false;
+  function keepAwake() {
+    var want = liveWorkout() && !document.hidden;
+    if (!want) { if (wakeLock) { try { wakeLock.release(); } catch (e) { /* déjà relâché */ } wakeLock = null; } return; }
+    if (wakeLock || wakeAsking || !navigator.wakeLock || !navigator.wakeLock.request) return;
+    wakeAsking = true;
+    navigator.wakeLock.request('screen').then(function (l) {
+      wakeAsking = false; wakeLock = l;
+      l.addEventListener('release', function () { if (wakeLock === l) wakeLock = null; });
+      if (!liveWorkout()) keepAwake();
+    }).catch(function () { wakeAsking = false; });
   }
 
   function decorate(scope) {
@@ -6182,7 +6260,7 @@ window.Views = Views;
     var nav = $nav.querySelector('nav'), ind = nav.querySelector('.ind');
     var sel = navSel || state.tab;
     var idx = TAB_IDS.indexOf(sel), moved = nav.dataset.i != null && Number(nav.dataset.i) !== idx && !reduceMotion;
-    var live = !!LS.get('workout', null);
+    var live = liveWorkout();
     nav.dataset.i = idx;
     nav.style.setProperty('--i', idx);
     // Sans recalcul entre-temps (aucune mesure faite), il faut le forcer pour relancer l'animation.
@@ -6688,8 +6766,9 @@ window.Views = Views;
   });
 
   // Envoi immédiat quand l'app passe en arrière-plan (changement d'app, verrouillage).
-  document.addEventListener('visibilitychange', function () { if (document.hidden) Store.flush(); });
-  window.addEventListener('pagehide', function () { Store.flush(); });
+  // La position dans la séance est gardée pour y revenir si iOS recharge l'app.
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { Views.train.remember(); Store.flush(); } keepAwake(); });
+  window.addEventListener('pagehide', function () { Views.train.remember(); Store.flush(); });
 
   // Retour sur l'app un autre jour : on se replace sur aujourd'hui.
   var openedOn = U.today();
