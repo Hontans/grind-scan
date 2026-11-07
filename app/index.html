@@ -724,6 +724,11 @@ html:not(.gl) .backdrop { z-index: 33; }
   box-shadow: var(--optics), 0 30px 70px -20px rgba(0, 0, 0, .55);
   transform-origin: 50% 100%;
 }
+/* clavier ouvert (iPhone) : la feuille se pose au-dessus de lui, toujours sous l'en-tête (voir fitKeyboard) */
+html.kb .sheet {
+  bottom: calc(var(--kb) + 8px);
+  max-height: calc(var(--cb-h, 100vh) - var(--kb) - 8px - var(--sat) - 10px - var(--head-h) - var(--glass-gap) - 12px);
+}
 html:not(.gl) .sheet { animation: up .8s var(--liquid-soft); }
 @keyframes up { from { transform: translateY(calc(100% + 48px)) scale(.94, 1.05); } }
 .gl .sheet > * { animation: sheetBody .5s var(--ease-out) .1s backwards; }
@@ -1278,7 +1283,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 14:16 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 14:45 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -6265,6 +6270,9 @@ window.Views = Views;
       Glass.attach('sheet', sh, { role: 'sheet', from: navShape(), morph: true, radius: 36 });
     }
     decorate(sh);
+    // Sa hauteur change avec son contenu (résultats d'une recherche, clavier) : le verre suit aussitôt.
+    if (cur && cur._ro) cur._ro.disconnect();
+    if (window.ResizeObserver) { sh._ro = new ResizeObserver(function () { Glass.track(); }); sh._ro.observe(sh); }
     sheetCleanup = opts.onClose || null;
     if (opts.bind) opts.bind(sh);
     Glass.track(400); // le contenu posé par bind change sa hauteur : le verre suit
@@ -6275,6 +6283,7 @@ window.Views = Views;
   function closeSheet() {
     var sh = $overlay.querySelector('.sheet:not(.closing)');
     if (!sh) return;
+    if (sh._ro) sh._ro.disconnect();
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (sheetCleanup) { try { sheetCleanup(); } catch (e) { /* ignoré */ } sheetCleanup = null; }
     document.documentElement.classList.remove('sheet-open');
@@ -6582,14 +6591,15 @@ window.Views = Views;
   // en bas, verres décalés) : on agrandit alors la page à la taille de l'écran (html.vfix), et le body devient
   // le repère des éléments fixés. --cb-h = hauteur mesurée de ce repère (sert aux feuilles).
   // Le cadre de Google, lui, ne reçoit pas toujours la marge de la barre d'état (env(safe-area-inset-top) à 0).
-  function fixedBox(css) {
+  function fixedRect(css) {
     var probe = document.createElement('div');
     probe.style.cssText = 'position:fixed;left:0;width:1px;visibility:hidden;pointer-events:none;' + css;
     document.body.appendChild(probe);
-    var h = probe.getBoundingClientRect().height;
+    var r = probe.getBoundingClientRect();
     probe.parentNode.removeChild(probe);
-    return h;
+    return r;
   }
+  function fixedBox(css) { return fixedRect(css).height; }
   function fitViewport() {
     var root = document.documentElement, st = root.style;
     root.classList.remove('vfix');
@@ -6617,9 +6627,11 @@ window.Views = Views;
   window.addEventListener('resize', fitViewport);
   // La page elle-même ne défile jamais (seul #scroll défile) : sinon le verre se décale de ses éléments.
   // Sauf pendant la saisie, où l'iPhone remonte la page au-dessus du clavier.
+  // Dans une feuille, c'est elle qui remonte au-dessus du clavier (fitKeyboard) : la page reste en place.
   window.addEventListener('scroll', function () {
-    var a = document.activeElement;
-    if ((window.scrollY || window.scrollX) && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) window.scrollTo(0, 0);
+    var a = editing();
+    if ((window.scrollY || window.scrollX) && !(a && !a.closest('.sheet'))) window.scrollTo(0, 0);
+    Glass.track(300); // les éléments fixés ont bougé avec la page : le verre les suit
   }, { passive: true });
   window.addEventListener('orientationchange', function () { [100, 400, 900].forEach(function (t) { setTimeout(fitViewport, t); }); });
   try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function () {}); } catch (e) { /* non pris en charge */ }
@@ -6632,11 +6644,46 @@ window.Views = Views;
     document.body.appendChild(rot);
   })();
 
-  // Clavier refermé : l'iPhone laisse parfois la page décalée.
+  // Clavier de l'iPhone : il recouvre la page sans la rétrécir. On mesure la partie encore visible
+  // (visualViewport) et la feuille ouverte remonte au-dessus du clavier (html.kb, --kb = sa hauteur) :
+  // les résultats d'une recherche restent visibles, et la page ne défile pas sous les verres.
+  function editing() {
+    var a = document.activeElement;
+    return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) ? a : null;
+  }
+  var vv = window.visualViewport, kbPx = 0;
+  function fitKeyboard() {
+    var a = editing(), inSheet = a && a.closest('.sheet'), kb = 0;
+    if (inSheet && (window.scrollY || window.scrollX)) window.scrollTo(0, 0);
+    if (a && vv) {
+      kb = Math.round(fixedRect('top:0;bottom:0').bottom - (vv.offsetTop + vv.height));
+      if (kb < 80) kb = 0; // barre d'outils ou zoom, pas un clavier
+    }
+    if (kb !== kbPx) {
+      kbPx = kb;
+      var root = document.documentElement;
+      root.classList.toggle('kb', kb > 0);
+      if (kb) root.style.setProperty('--kb', kb + 'px'); else root.style.removeProperty('--kb');
+    }
+    // le champ reste visible dans la feuille raccourcie (sans faire défiler la page)
+    if (inSheet && kb) {
+      var r = a.getBoundingClientRect(), b = inSheet.getBoundingClientRect();
+      if (r.bottom > b.bottom - 12) inSheet.scrollTop += r.bottom - b.bottom + 12;
+      else if (r.top < b.top + 12) inSheet.scrollTop -= b.top + 12 - r.top;
+    }
+    Glass.track(450);
+  }
+  // Le clavier s'ouvre et se ferme en ~0,3 s, et l'iPhone ne prévient pas toujours à la fin : on revérifie.
+  function fitKeyboardSoon() {
+    [0, 120, 320, 650, 1100].forEach(function (t) { setTimeout(fitKeyboard, t); });
+  }
+  if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
+  document.addEventListener('focusin', function (e) { if (editing() === e.target) fitKeyboardSoon(); });
+  // Clavier refermé : l'iPhone laisse parfois la page décalée, et le verre doit revenir avec elle.
   document.addEventListener('focusout', function () {
     setTimeout(function () {
-      var a = document.activeElement;
-      if (!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) window.scrollTo(0, 0);
+      if (!editing()) window.scrollTo(0, 0);
+      fitKeyboardSoon();
     }, 60);
   });
 
