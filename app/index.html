@@ -1302,7 +1302,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 21:19 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 22:06 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2400,7 +2400,7 @@ var U = (function () {
     });
   }
   function slug(s) {
-    return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
+    return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'x';
   }
   function mmss(sec) { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + pad2(sec % 60); }
 
@@ -2528,7 +2528,8 @@ var Nutri = (function () {
   function r0(v) { return Math.round(v || 0); }
   function r1(v) { return Math.round((v || 0) * 10) / 10; }
   function norm(s) {
-    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘]/g, "'").toLowerCase().trim();
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘]/g, "'").toLowerCase()
+      .replace(/œ/g, 'oe').replace(/æ/g, 'ae').trim();
   }
 
   function meals(settings) {
@@ -2696,7 +2697,7 @@ var Nutri = (function () {
   <script>
 /* Calculs entraînement (purs, testés dans test/client.test.js). */
 var Train = (function () {
-  function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+  function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/œ/g, 'oe').replace(/æ/g, 'ae'); }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }
   function roundTo(v, step) { return Math.round(v / step) * step; }
 
