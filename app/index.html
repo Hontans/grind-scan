@@ -81,6 +81,7 @@
   --m-p: #7EA6F5;
   --m-c: #DDB04B;
   --m-f: #E584AE;
+  --m-fb: #86CFA0;
 
   --r-lg: 26px;
   --r: 18px;
@@ -152,6 +153,7 @@
     --m-p: #3D6FD9;
     --m-c: #B07F12;
     --m-f: #BE4C7C;
+    --m-fb: #2F8452;
     color-scheme: light;
   }
 }
@@ -197,6 +199,7 @@
   --m-p: #3D6FD9;
   --m-c: #B07F12;
   --m-f: #BE4C7C;
+  --m-fb: #2F8452;
   color-scheme: light;
 }
 
@@ -1012,12 +1015,26 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .ring-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .ring-text b { font: 600 25px/1.05 var(--font); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .ring-text span { font-size: 11.5px; color: var(--text-3); max-width: 84px; line-height: 1.25; margin-top: 2px; }
-.macros { flex: 1; min-width: 0; display: grid; gap: 11px; }
+.macros { flex: 1; min-width: 0; display: grid; gap: 9px; }
 .macro-head { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 500; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
 .macro-head .muted { font-size: 12.5px; font-weight: 400; }
 .macro-track { height: 6px; border-radius: 6px; background: var(--field); overflow: hidden; }
 .macro-fill { height: 100%; border-radius: 6px; transition: width 1.2s var(--liquid); }
-.m-p { background: var(--m-p); } .m-c { background: var(--m-c); } .m-f { background: var(--m-f); }
+.m-p { background: var(--m-p); } .m-c { background: var(--m-c); } .m-f { background: var(--m-f); } .m-fb { background: var(--m-fb); }
+/* pastilles de macros par repas et par aliment (mêmes couleurs que les barres) */
+.mbs { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.mb {
+  --mc: var(--text-2);
+  display: inline-flex; align-items: baseline; gap: 3px; height: 22px; padding: 0 8px; border-radius: 999px;
+  font: 600 12px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--mc); background: var(--field);
+}
+@supports (background: color-mix(in srgb, red 10%, transparent)) { .mb { background: color-mix(in srgb, var(--mc) 15%, transparent); } }
+.mb i { font-style: normal; font-size: 10px; font-weight: 700; opacity: .75; }
+.mb-p { --mc: var(--m-p); } .mb-c { --mc: var(--m-c); } .mb-f { --mc: var(--m-f); } .mb-fb { --mc: var(--m-fb); }
+.meal-macros { margin: -2px 0 8px; gap: 6px; }
+.meal-macros .mb { height: 26px; padding: 0 10px; font-size: 13.5px; line-height: 26px; }
+.meal-macros .mb i { font-size: 11px; }
+.entry-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; width: 100%; }
 .meal .card-head { margin-bottom: 6px; }
 
 /* séance */
@@ -1261,7 +1278,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 02:19 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 14:16 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2491,16 +2508,61 @@ var Nutri = (function () {
     return DEFAULT_MEALS.slice();
   }
 
-  /** Valeurs pour une quantité (g) d'un aliment défini pour 100 g. */
-  function forQty(food, qty) {
-    var k = (Number(qty) || 0) / 100;
-    return { kcal: r0(food.kcal * k), p: r1(food.p * k), c: r1(food.c * k), f: r1(food.f * k) };
+  /**
+   * Fibres pour 100 g des aliments de base du coach (onglet ALIMENTS, qui n'a pas de colonne fibres).
+   * Valeurs moyennes arrondies (table Ciqual) ; une valeur saisie dans l'aliment l'emporte toujours.
+   */
+  var FIBER_100G = {
+    'poulet (blanc, cuit)': 0, 'dinde (escalope, cuite)': 0, 'steak hache 5% (cru)': 0, 'thon au naturel': 0, 'saumon (cuit)': 0,
+    'oeuf entier': 0, "blanc d'oeuf": 0, 'skyr nature': 0, 'fromage blanc 0%': 0, 'yaourt grec 0%': 0, 'lait demi-ecreme': 0,
+    'whey (poudre)': 0, 'riz blanc (cuit)': 0.4, 'pates (cuites)': 1.8, 'pommes de terre (cuites)': 1.8, 'patate douce (cuite)': 3,
+    "flocons d'avoine": 10, 'pain complet': 7, 'lentilles (cuites)': 7.9, 'pois chiches (cuits)': 7.6, 'banane': 2.6, 'pomme': 2.4,
+    'framboises': 6.5, 'brocoli (cuit)': 3.3, 'haricots verts (cuits)': 3.4, "huile d'olive": 0, 'beurre de cacahuete': 6,
+    'amandes': 12.5, 'avocat': 6.7, 'miel': 0.2, 'chocolat noir 70%': 10.9, 'creme de riz (poudre)': 1.5, "beurre d'amande": 10,
+    "farine d'avoine (prozis)": 9
+  };
+
+  function num(v) { return v === null || v === undefined || v === '' || !isFinite(Number(v)) ? null : Number(v); }
+
+  /** Fibres pour 100 g d'un aliment : sa valeur, sinon la table des aliments de base, sinon null (inconnu). */
+  function fiberOf(food) {
+    if (!food) return null;
+    var v = num(food.fiber);
+    if (v !== null) return v;
+    var t = FIBER_100G[norm(food.name)];
+    return t === undefined || food.brand ? null : t;
   }
 
-  function totals(entries) {
-    var t = { kcal: 0, p: 0, c: 0, f: 0 };
-    (entries || []).forEach(function (e) { t.kcal += e.kcal || 0; t.p += e.p || 0; t.c += e.c || 0; t.f += e.f || 0; });
-    return { kcal: r0(t.kcal), p: r1(t.p), c: r1(t.c), f: r1(t.f) };
+  /** Valeurs pour une quantité (g) d'un aliment défini pour 100 g (fiber : null si inconnues). */
+  function forQty(food, qty) {
+    var k = (Number(qty) || 0) / 100, fb = fiberOf(food);
+    return { kcal: r0(food.kcal * k), p: r1(food.p * k), c: r1(food.c * k), f: r1(food.f * k), fiber: fb === null ? null : r1(fb * k) };
+  }
+
+  /**
+   * Fibres d'une entrée du journal : celles gardées à l'ajout, sinon recalculées d'après l'aliment
+   * (entrées plus anciennes que la colonne), sinon null. foodsById : { id: aliment }.
+   */
+  function entryFiber(e, foodsById) {
+    var v = num(e && e.fiber);
+    if (v !== null) return v;
+    var food = e && e.foodId && foodsById && foodsById[e.foodId];
+    var fb = food && e.qty ? fiberOf(food) : null;
+    return fb === null ? null : r1(fb * e.qty / 100);
+  }
+
+  /**
+   * Totaux d'entrées. Avec foodsById, les fibres manquantes sont recalculées (entryFiber).
+   * fiber = somme des fibres connues ; fiberMissing = nombre d'entrées dont on ne connaît pas les fibres.
+   */
+  function totals(entries, foodsById) {
+    var t = { kcal: 0, p: 0, c: 0, f: 0, fiber: 0 }, miss = 0;
+    (entries || []).forEach(function (e) {
+      t.kcal += e.kcal || 0; t.p += e.p || 0; t.c += e.c || 0; t.f += e.f || 0;
+      var fb = entryFiber(e, foodsById);
+      if (fb === null) miss++; else t.fiber += fb;
+    });
+    return { kcal: r0(t.kcal), p: r1(t.p), c: r1(t.c), f: r1(t.f), fiber: r1(t.fiber), fiberMissing: miss };
   }
 
   function dayEntries(log, date) { return (log || []).filter(function (e) { return e.date === date; }); }
@@ -2566,13 +2628,13 @@ var Nutri = (function () {
     var groups = {}, order = [];
     (mealsRows || []).slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }).forEach(function (m) {
       var own = recipeKey(m.id), key = own || 'coach:' + m.meal;
-      if (!groups[key]) { groups[key] = { name: m.meal, items: [], kcal: 0, p: 0, c: 0, f: 0, own: !!own, key: key, ids: [] }; order.push(key); }
+      if (!groups[key]) { groups[key] = { name: m.meal, items: [], kcal: 0, p: 0, c: 0, f: 0, fiber: 0, own: !!own, key: key, ids: [] }; order.push(key); }
       var g = groups[key], food = byId[m.foodId];
       g.items.push({ foodId: m.foodId, name: m.name, qty: m.qty, food: food || null });
       g.ids.push(m.id);
-      if (food) { var v = forQty(food, m.qty); g.kcal += v.kcal; g.p += v.p; g.c += v.c; g.f += v.f; }
+      if (food) { var v = forQty(food, m.qty); g.kcal += v.kcal; g.p += v.p; g.c += v.c; g.f += v.f; g.fiber += v.fiber || 0; }
     });
-    return order.map(function (k) { var g = groups[k]; g.p = r1(g.p); g.c = r1(g.c); g.f = r1(g.f); return g; })
+    return order.map(function (k) { var g = groups[k]; g.p = r1(g.p); g.c = r1(g.c); g.f = r1(g.f); g.fiber = r1(g.fiber); return g; })
       .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0); });
   }
 
@@ -2585,19 +2647,20 @@ var Nutri = (function () {
 
   /** Recette : ingrédients crus [{ food, qty }] + poids cuit total → aliment pour 100 g. */
   function recipe(name, ingredients, cookedWeight) {
-    var t = { kcal: 0, p: 0, c: 0, f: 0 }, raw = 0;
+    var t = { kcal: 0, p: 0, c: 0, f: 0, fiber: 0 }, raw = 0, fiberKnown = true;
     ingredients.forEach(function (i) {
       var v = forQty(i.food, i.qty);
       t.kcal += v.kcal; t.p += v.p; t.c += v.c; t.f += v.f;
+      if (v.fiber === null) fiberKnown = false; else t.fiber += v.fiber;
       raw += Number(i.qty) || 0;
     });
     var w = Number(cookedWeight) || raw;
     if (!w) return null;
     var k = 100 / w;
-    return { name: name, kcal: r0(t.kcal * k), p: r1(t.p * k), c: r1(t.c * k), f: r1(t.f * k), category: 'Recette', source: 'recette' };
+    return { name: name, kcal: r0(t.kcal * k), p: r1(t.p * k), c: r1(t.c * k), f: r1(t.f * k), fiber: fiberKnown ? r1(t.fiber * k) : null, category: 'Recette', source: 'recette' };
   }
 
-  return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
+  return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, fiberOf: fiberOf, entryFiber: entryFiber, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
     search: search, recents: recents, mealTemplates: mealTemplates, recipeKey: recipeKey, recipeRows: recipeRows, recipe: recipe, norm: norm };
 })();
 </script>
@@ -3821,32 +3884,50 @@ Views.food = (function () {
       '<div class="macro-track"><div class="macro-fill ' + cls + '" style="width:' + pct + '%"></div></div></div>';
   }
 
+  /** Pastilles P / G / L (+ fibres si connues) aux couleurs du récapitulatif ; hideZero : sans les pastilles à 0 (aliments). */
+  function badges(v, cls, hideZero) {
+    var one = function (k, letter, val, name) {
+      if (hideZero && !val) return '';
+      return '<span class="mb mb-' + k + '" title="' + name + '"><i>' + letter + '</i>' + U.nf(val, val < 10 ? 1 : 0) + '</span>';
+    };
+    return '<span class="mbs' + (cls ? ' ' + cls : '') + '" aria-label="' + U.nf(v.p) + ' g de protéines, ' + U.nf(v.c) + ' g de glucides, ' + U.nf(v.f) + ' g de lipides' +
+      (v.fiber == null ? '' : ', ' + U.nf(v.fiber) + ' g de fibres') + '">' +
+      one('p', 'P', v.p || 0, 'Protéines (g)') + one('c', 'G', v.c || 0, 'Glucides (g)') + one('f', 'L', v.f || 0, 'Lipides (g)') +
+      (v.fiber == null ? '' : one('fb', 'Fi', v.fiber, 'Fibres (g)')) + '</span>';
+  }
+
   function render(st, a) {
     app = a; state = st;
     var date = st.date;
     var list = entries(date);
-    var tot = Nutri.totals(list);
+    var byId = {};
+    foods().forEach(function (f) { byId[f.id] = f; });
+    var tot = Nutri.totals(list, byId);
     var tg = targetsFor(date);
+    var fiberTarget = Number(settings().fiberTarget) || 30;
     var t = tg.t;
     var summary = '<section class="card food-summary">' +
       '<div class="ring-wrap">' + ring(tot.kcal, t && t.kcal) + '</div>' +
       '<div class="macros">' +
       '<div class="muted small">' + U.nf(tot.kcal, 0) + (t ? ' / ' + U.nf(t.kcal, 0) : '') + ' kcal · jour ' + (tg.on ? 'ON' : 'OFF') + '</div>' +
       bar('Protéines', tot.p, t && t.p, 'm-p') + bar('Glucides', tot.c, t && t.c, 'm-c') + bar('Lipides', tot.f, t && t.f, 'm-f') +
+      bar('Fibres', tot.fiber, fiberTarget, 'm-fb') +
       '</div></section>';
     var meals = Nutri.meals(settings());
     list.forEach(function (e) { if (e.meal && meals.indexOf(e.meal) < 0) meals.push(e.meal); });
     var yesterday = entries(U.addDays(date, -1));
     var cards = meals.map(function (m) {
       var items = list.filter(function (e) { return e.meal === m; });
-      var sum = Nutri.totals(items);
+      var sum = Nutri.totals(items, byId);
       var copy = !items.length && yesterday.some(function (e) { return e.meal === m; })
         ? '<button class="btn ghost" data-copy="' + U.esc(m) + '">Copier d\'hier</button>' : '';
       return '<section class="card meal">' +
-        '<div class="card-head"><h2>' + U.esc(m) + '</h2><span class="muted small">' + (items.length ? U.nf(sum.kcal, 0) + ' kcal · P ' + U.nf(sum.p, 0) + ' g' : '') + '</span></div>' +
+        '<div class="card-head"><h2>' + U.esc(m) + '</h2><span class="muted small">' + (items.length ? U.nf(sum.kcal, 0) + ' kcal' : '') + '</span></div>' +
+        (items.length ? badges({ p: sum.p, c: sum.c, f: sum.f, fiber: sum.fiberMissing < items.length ? sum.fiber : null }, 'meal-macros') : '') +
         (items.length ? '<ul class="entries">' + items.map(function (e) {
           return '<li><button class="entry" data-entry="' + U.esc(e.id) + '"><span class="entry-name">' + U.esc(e.name) + '</span>' +
-            '<span class="muted small">' + (e.qty ? U.nf(e.qty, 0) + ' g · ' : '') + U.nf(e.kcal, 0) + ' kcal</span></button></li>';
+            '<span class="entry-meta"><span class="muted small">' + (e.qty ? U.nf(e.qty, 0) + ' g · ' : '') + U.nf(e.kcal, 0) + ' kcal</span>' +
+            badges({ p: e.p, c: e.c, f: e.f, fiber: Nutri.entryFiber(e, byId) }, '', true) + '</span></button></li>';
         }).join('') + '</ul>' : '') +
         '<div class="meal-actions"><button class="btn soft" data-add="' + U.esc(m) + '">+ Ajouter</button>' + copy + '</div>' +
         '</section>';
@@ -3881,7 +3962,7 @@ Views.food = (function () {
   function logFood(food, qty, meal, existing) {
     var v = Nutri.forQty(food, qty);
     var rec = Object.assign({}, existing || { id: U.uid(), date: state.date }, {
-      meal: meal, foodId: food.id, name: displayName(food), qty: qty, kcal: v.kcal, p: v.p, c: v.c, f: v.f
+      meal: meal, foodId: food.id, name: displayName(food), qty: qty, kcal: v.kcal, p: v.p, c: v.c, f: v.f, fiber: v.fiber
     });
     Store.put('FOOD_LOG', rec);
   }
@@ -4045,7 +4126,7 @@ Views.food = (function () {
         var preview = function () {
           var q = U.parseNum(input.value) || 0;
           var v = Nutri.forQty(food, q);
-          p.querySelector('[data-preview]').innerHTML = '<b>' + U.nf(v.kcal, 0) + ' kcal</b><span>P ' + U.nf(v.p) + ' g</span><span>G ' + U.nf(v.c) + ' g</span><span>L ' + U.nf(v.f) + ' g</span>';
+          p.querySelector('[data-preview]').innerHTML = '<b>' + U.nf(v.kcal, 0) + ' kcal</b><span>P ' + U.nf(v.p) + ' g</span><span>G ' + U.nf(v.c) + ' g</span><span>L ' + U.nf(v.f) + ' g</span>' + (v.fiber == null ? '' : '<span>Fibres ' + U.nf(v.fiber) + ' g</span>');
         };
         input.addEventListener('input', preview);
         input.addEventListener('focus', function () { input.select(); });
@@ -4092,7 +4173,7 @@ Views.food = (function () {
     app.openSheet({
       title: 'Ajout rapide · ' + meal,
       html: '<label class="field"><span class="field-label">Nom</span><span class="field-box"><input data-k="name" value="' + U.esc(v.name || '') + '" placeholder="Restaurant, plat maison…"></span></label>' +
-        '<div class="fields">' + num('kcal', 'Calories', 'kcal') + num('p', 'Protéines', 'g') + num('c', 'Glucides', 'g') + num('f', 'Lipides', 'g') + '</div>' +
+        '<div class="fields">' + num('kcal', 'Calories', 'kcal') + num('p', 'Protéines', 'g') + num('c', 'Glucides', 'g') + num('f', 'Lipides', 'g') + num('fiber', 'Fibres', 'g') + '</div>' +
         '<button class="btn primary block" data-ok>' + (entry ? 'Enregistrer' : 'Ajouter') + '</button>' + (entry ? '<button class="btn danger block" data-del>Supprimer</button>' : ''),
       bind: function (p) {
         p.querySelector('[data-k="kcal"]').focus();
@@ -4103,7 +4184,7 @@ Views.food = (function () {
           if (!get('kcal')) { app.toast('Indique au moins les calories'); return; }
           Store.put('FOOD_LOG', Object.assign({}, entry || { id: U.uid(), date: state.date }, {
             meal: meal, foodId: '', qty: null, name: p.querySelector('[data-k="name"]').value.trim() || 'Ajout rapide',
-            kcal: Math.round(get('kcal')), p: get('p') || 0, c: get('c') || 0, f: get('f') || 0
+            kcal: Math.round(get('kcal')), p: get('p') || 0, c: get('c') || 0, f: get('f') || 0, fiber: get('fiber')
           }));
           after('Ajouté à ' + meal);
         });
@@ -4174,7 +4255,7 @@ Views.food = (function () {
       title: meal ? 'Recettes → ' + meal : 'Mes recettes',
       html: (groups.length ? '<ul class="list">' + groups.map(function (g, i) {
         return '<li class="vid-row"><button class="food-row" data-tpl="' + i + '"><span class="entry-name">' + U.esc(g.name) + '</span>' +
-          '<span class="muted small">' + U.nf(g.kcal, 0) + ' kcal · P ' + U.nf(g.p, 0) + ' g · ' + g.items.map(function (x) { return U.esc(x.name) + ' ' + U.nf(x.qty, 0) + ' g'; }).join(', ') +
+          '<span class="muted small">' + U.nf(g.kcal, 0) + ' kcal · P ' + U.nf(g.p, 0) + ' · G ' + U.nf(g.c, 0) + ' · L ' + U.nf(g.f, 0) + ' g · ' + g.items.map(function (x) { return U.esc(x.name) + ' ' + U.nf(x.qty, 0) + ' g'; }).join(', ') +
           (g.own ? '' : ' · plan du coach') + '</span></button>' +
           (meal && g.own ? '<button class="icon-btn sm" data-edit="' + i + '" aria-label="Modifier la recette">' + app.icon('settings', 'sm') + '</button>' : '') + '</li>';
       }).join('') + '</ul>' : '<p class="muted">Aucune recette pour l\'instant. Une recette, c\'est un nom et plusieurs aliments avec leur quantité : tu l\'ajoutes ensuite d\'un geste à n\'importe quel repas.</p>') +
@@ -4302,7 +4383,7 @@ Views.food = (function () {
         var drawTotal = function () {
           var t = Nutri.totals(d.items.map(function (it) { return Nutri.forQty(it.food, it.qty); }));
           var w = d.items.reduce(function (a, it) { return a + (Number(it.qty) || 0); }, 0);
-          p.querySelector('[data-preview]').innerHTML = d.items.length ? '<b>' + U.nf(t.kcal, 0) + ' kcal</b><span>P ' + U.nf(t.p) + ' g</span><span>G ' + U.nf(t.c) + ' g</span><span>L ' + U.nf(t.f) + ' g</span><span>' + U.nf(w, 0) + ' g</span>' : '';
+          p.querySelector('[data-preview]').innerHTML = d.items.length ? '<b>' + U.nf(t.kcal, 0) + ' kcal</b><span>P ' + U.nf(t.p) + ' g</span><span>G ' + U.nf(t.c) + ' g</span><span>L ' + U.nf(t.f) + ' g</span>' + (t.fiber ? '<span>Fibres ' + U.nf(t.fiber) + ' g</span>' : '') + '<span>' + U.nf(w, 0) + ' g</span>' : '';
         };
         var drawResults = function () {
           var q = input.value.trim();
