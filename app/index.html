@@ -12,7 +12,8 @@
   <title>Grind</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="icon" type="image/png" href="icon-180.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <meta name="theme-color" content="#07080B">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -553,14 +554,14 @@ svg { display: block; }
   flex: none; width: 52px; height: 52px; padding: 0;
   display: flex; align-items: center; justify-content: center; gap: 0;
   opacity: .82; overflow: hidden; white-space: nowrap;
-  transition: width .75s var(--liquid), gap .75s var(--liquid), opacity .25s, transform .9s var(--liquid);
+  transition: opacity .25s; /* la taille change d'un coup : c'est le verre, sur ses ressorts, qui fait le mouvement */
 }
 .tabbar nav.split button[aria-current="page"] { width: 118px; gap: 7px; opacity: 1; color: var(--on-accent); }
 .tabbar nav.split .tab-l {
   display: block; max-width: 0; opacity: 0; font: 600 14.5px/1 var(--font); letter-spacing: -.01em;
-  transition: max-width .75s var(--liquid), opacity .2s;
+  transition: opacity .12s;
 }
-.tabbar nav.split button[aria-current="page"] .tab-l { max-width: 80px; opacity: 1; transition: max-width .75s var(--liquid), opacity .35s ease .18s; }
+.tabbar nav.split button[aria-current="page"] .tab-l { max-width: 80px; opacity: 1; transition: opacity .3s ease .22s; }
 .tabbar nav.split button:active { transform: none; }
 .sheet-open .tabbar nav.split button { opacity: 0; }
 @media (max-width: 359px) {
@@ -1260,7 +1261,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 01:42 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 01:55 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1602,7 +1603,7 @@ window.Liquid = (function () {
 
   // ---------------------------------------------------------------- shader
 
-  var N = 8;
+  var N = 12; // en-tête (3), barre (capsule, ou 4 gouttes et la pilule), minuteur, feuille, notification, et celles qui se replient
   var VERT = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
   var FRAG = [
     '#ifdef GL_FRAGMENT_PRECISION_HIGH',
@@ -1917,9 +1918,11 @@ window.Liquid = (function () {
       error:  { frost: .5, tint: RED, a: .86 }
     }
   };
+  // Pilule de l'onglet actif (barre en gouttes) : même matière que les boutons accentués, ressort plus souple pour voyager.
+  MAT.dark.pill = MAT.dark.accent; MAT.light.pill = MAT.light.accent;
   // Ressorts : raideur et amortissement. Peu amortis pour les gouttes, plus posés pour les grandes formes.
   var SPRING = {
-    nav:    [240, .68], head: [230, .66], circle: [260, .56], dock: [150, .56],
+    nav:    [240, .68], head: [230, .66], pill: [150, .6], circle: [260, .56], dock: [150, .56],
     toast:  [165, .58], sheet: [170, .74], accent: [170, .58], error: [165, .58]
   };
 
@@ -6027,7 +6030,7 @@ window.Views = Views;
       if (splitNav()) { // gouttes : celle sous le doigt enfle, pas de glissé
         var tb = e.target.closest('[data-tab]');
         if (!tb) return;
-        var gid = 'tab:' + tb.getAttribute('data-tab');
+        var gid = tb.getAttribute('data-tab') === state.tab ? 'tab:sel' : 'tab:' + tb.getAttribute('data-tab');
         Glass.press(gid, true);
         var up = function () { Glass.press(gid, false); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
         window.addEventListener('pointerup', up);
@@ -6079,6 +6082,10 @@ window.Views = Views;
     // Sans recalcul entre-temps (aucune mesure faite), il faut le forcer pour relancer l'animation.
     var reflow = moved && !(restarted && (Glass.on || $scroll.querySelector('.fr-w')));
     if (moved) { ind.classList.remove('move'); if (reflow) void ind.offsetWidth; ind.classList.add('move'); }
+    // Gouttes : les icônes changent de place d'un coup avec la mise en page ; on les fait glisser
+    // de l'ancienne à la nouvelle (FLIP), au rythme du verre, pour qu'elles restent dans leur goutte.
+    var glide = moved && splitNav() && nav.classList.contains('split');
+    var icons = glide ? Array.prototype.map.call(nav.querySelectorAll('[data-tab] > span'), function (s) { return [s, s.getBoundingClientRect().left]; }) : null;
     nav.querySelectorAll('[data-tab]').forEach(function (b) {
       var on = b.getAttribute('data-tab') === state.tab;
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -6089,16 +6096,29 @@ window.Views = Views;
     var split = splitNav();
     nav.classList.toggle('split', split);
     if (split) {
-      // Gouttes : une forme de verre par onglet ; l'active s'étire en pilule colorée avec son nom.
+      // Gouttes : une goutte de verre par onglet, et une pilule colorée (tab:sel) sur l'onglet actif.
+      // La pilule voyage d'un onglet à l'autre comme la pastille de la capsule, en s'étirant ; la goutte
+      // qu'elle rejoint se fond en elle, et celle qu'elle quitte en ressort par un col, comme les boutons de l'en-tête.
+      var first = !nav.dataset.split;
+      nav.dataset.split = '1';
       Glass.remove('nav');
       Glass.lensTo(null);
+      var cur = null;
       nav.querySelectorAll('[data-tab]').forEach(function (b) {
-        var id = b.getAttribute('data-tab'), on = id === state.tab;
-        Glass.attach('tab:' + id, b, { role: on ? 'accent' : 'nav', radius: 'pill', instant: !moved });
-        if (on && moved) Glass.kick('tab:' + id, 1.2);
+        var id = b.getAttribute('data-tab');
+        if (id === state.tab) { cur = b; Glass.remove('tab:' + id); return; }
+        // née dans la pilule (à son ancienne place, encore sa cible), elle s'en détache en rejoignant sa place
+        Glass.attach('tab:' + id, b, { role: 'nav', from: 'tab:sel', radius: 'pill', instant: first });
       });
-      if (moved) Glass.track(1000); // la pilule change de goutte : le verre suit l'étirement
+      if (cur) Glass.attach('tab:sel', cur, { role: 'pill', radius: 'pill', instant: first });
+      if (icons) {
+        icons.forEach(function (it) { var dx = it[1] - it[0].getBoundingClientRect().left; it.push(dx); if (Math.abs(dx) > .5) { it[0].style.transition = 'none'; it[0].style.transform = 'translateX(' + dx + 'px)'; } });
+        void nav.offsetWidth;
+        icons.forEach(function (it) { if (Math.abs(it[2]) > .5) { it[0].style.transition = 'transform .62s var(--liquid-soft)'; it[0].style.transform = ''; } });
+      }
+      if (moved) Glass.track(700);
     } else {
+      delete nav.dataset.split;
       Glass.prune('tab:', {});
       Glass.attach('nav', nav, { role: 'nav', instant: true });
       Glass.lensTo(nav.querySelector('[aria-current="page"]'));
@@ -6107,7 +6127,7 @@ window.Views = Views;
   /** Barre d'onglets en gouttes séparées (réglage d'apparence), seulement avec le verre WebGL. */
   function splitNav() { return look.nav === 'drops' && Glass.on; }
   /** Forme d'où sortent les feuilles et le minuteur : la capsule, ou la goutte de l'onglet actif. */
-  function navShape() { return splitNav() ? 'tab:' + state.tab : 'nav'; }
+  function navShape() { return splitNav() ? 'tab:sel' : 'nav'; }
 
   // ---------------------------------------------------------------- feuilles
 
