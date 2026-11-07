@@ -1231,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-06 23:53 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 00:12 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2501,19 +2501,37 @@ var Nutri = (function () {
     return out.slice(0, limit || 15);
   }
 
-  /** Repas types groupés : [{ name, items: [...], kcal }]. */
+  /** Identifiant d'une recette créée dans l'app, d'après l'identifiant d'une de ses lignes (rc-…-N), sinon null. */
+  function recipeKey(rowId) {
+    var m = /^(rc-.+)-\d+$/.exec(String(rowId || ''));
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Recettes (onglet MEALS, une ligne par aliment) groupées : [{ name, items: [...], kcal, p, c, f, own, key, ids }].
+   * own = créée dans l'app (modifiable) ; les autres viennent du plan du coach. Les tiennes d'abord.
+   */
   function mealTemplates(mealsRows, foods) {
     var byId = {};
     (foods || []).forEach(function (f) { byId[f.id] = f; });
     var groups = {}, order = [];
     (mealsRows || []).slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }).forEach(function (m) {
-      if (!groups[m.meal]) { groups[m.meal] = { name: m.meal, items: [], kcal: 0 }; order.push(m.meal); }
-      var food = byId[m.foodId];
-      var item = { foodId: m.foodId, name: m.name, qty: m.qty, food: food || null };
-      groups[m.meal].items.push(item);
-      if (food) groups[m.meal].kcal += forQty(food, m.qty).kcal;
+      var own = recipeKey(m.id), key = own || 'coach:' + m.meal;
+      if (!groups[key]) { groups[key] = { name: m.meal, items: [], kcal: 0, p: 0, c: 0, f: 0, own: !!own, key: key, ids: [] }; order.push(key); }
+      var g = groups[key], food = byId[m.foodId];
+      g.items.push({ foodId: m.foodId, name: m.name, qty: m.qty, food: food || null });
+      g.ids.push(m.id);
+      if (food) { var v = forQty(food, m.qty); g.kcal += v.kcal; g.p += v.p; g.c += v.c; g.f += v.f; }
     });
-    return order.map(function (k) { return groups[k]; });
+    return order.map(function (k) { var g = groups[k]; g.p = r1(g.p); g.c = r1(g.c); g.f = r1(g.f); return g; })
+      .sort(function (a, b) { return (b.own ? 1 : 0) - (a.own ? 1 : 0); });
+  }
+
+  /** Lignes MEALS d'une recette : nom + ingrédients [{ food, qty }] ; key = identifiant de la recette (rc-…). */
+  function recipeRows(key, name, ingredients) {
+    return ingredients.filter(function (i) { return i.food && Number(i.qty) > 0; }).map(function (i, n) {
+      return { id: key + '-' + (n + 1), meal: name, order: n + 1, foodId: i.food.id, name: i.food.name, qty: Number(i.qty) };
+    });
   }
 
   /** Recette : ingrédients crus [{ food, qty }] + poids cuit total → aliment pour 100 g. */
@@ -2531,7 +2549,7 @@ var Nutri = (function () {
   }
 
   return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
-    search: search, recents: recents, mealTemplates: mealTemplates, recipe: recipe, norm: norm };
+    search: search, recents: recents, mealTemplates: mealTemplates, recipeKey: recipeKey, recipeRows: recipeRows, recipe: recipe, norm: norm };
 })();
 </script>
 
@@ -3767,7 +3785,7 @@ Views.food = (function () {
     var tools = '<div class="tool-row">' +
       '<button class="btn soft" data-open="targets">Objectifs</button>' +
       '<button class="btn soft" data-open="foods">Mes aliments</button>' +
-      '<button class="btn soft" data-open="recipe">Nouvelle recette</button></div>';
+      '<button class="btn soft" data-open="recipes">Mes recettes</button></div>';
     return summary + cards + tools;
   }
 
@@ -3784,7 +3802,7 @@ Views.food = (function () {
         var w = b.getAttribute('data-open');
         if (w === 'targets') return openTargets();
         if (w === 'foods') return openFoods();
-        if (w === 'recipe') return openRecipe();
+        if (w === 'recipes') return openRecipes();
       }
     });
   }
@@ -3830,7 +3848,7 @@ Views.food = (function () {
       html: '<div class="search"><input class="input" type="search" placeholder="Rechercher un aliment" autocomplete="off" data-q autofocus></div>' +
         '<div class="quick-actions">' +
         '<button class="qa" data-act="scan"><span class="ic">' + app.icon('scan') + '</span>Scanner</button>' +
-        '<button class="qa" data-act="templates"><span class="ic">' + app.icon('list') + '</span>Repas type</button>' +
+        '<button class="qa" data-act="templates"><span class="ic">' + app.icon('list') + '</span>Recette</button>' +
         '<button class="qa" data-act="quick"><span class="ic">' + app.icon('bolt') + '</span>Rapide</button>' +
         '<button class="qa" data-act="create"><span class="ic">' + app.icon('plus') + '</span>Produit</button></div>' +
         '<div data-results></div>',
@@ -3877,7 +3895,7 @@ Views.food = (function () {
           if ((b = e.target.closest('[data-act]'))) {
             var act = b.getAttribute('data-act');
             if (act === 'scan') return Scanner.open(function (code) { return lookupBarcode(code, meal); }, { meal: meal, date: state.date });
-            if (act === 'templates') return openTemplates(meal);
+            if (act === 'templates') return openRecipes(meal);
             if (act === 'quick') return openQuick(meal);
             if (act === 'create') return openCreate({ meal: meal, name: input.value.trim() });
           }
@@ -3888,23 +3906,50 @@ Views.food = (function () {
 
   // ---------------------------------------------------------------- code-barre
 
-  function lookupBarcode(code, meal) {
+  /**
+   * Produit d'après son code-barre : ta base d'abord, sinon Open Food Facts (valeurs pour 100 g).
+   * → { food, known } ou { missing: 'unknown' | 'incomplete' | 'error', name }.
+   */
+  function findBarcode(code) {
     var local = foods().filter(function (f) { return String(f.barcode || '') === code; })[0];
-    if (local) { openQty(local, { meal: meal }); return Promise.resolve(); }
+    if (local) return Promise.resolve({ food: local, known: true });
     app.toast('Recherche du produit…');
     return U.server('api_foodByBarcode', code).then(function (json) {
       var res = json ? JSON.parse(json) : null;
-      if (res && !res.incomplete) {
-        Store.put('FOODS', res);
-        openQty(res, { meal: meal });
-      } else {
-        app.toast(res ? 'Produit sans valeurs nutritionnelles : complète-les' : 'Produit inconnu : crée-le une fois');
-        openCreate({ meal: meal, barcode: code, name: res && res.name });
-      }
-    }).catch(function (err) {
+      if (res && !res.incomplete) return { food: res };
+      return { missing: res ? 'incomplete' : 'unknown', name: res && res.name };
+    }, function (err) {
       app.toast(err.message);
-      openCreate({ meal: meal, barcode: code });
+      return { missing: 'error' };
     });
+  }
+
+  function missingToast(r, unknownMsg) {
+    if (r.missing === 'incomplete') app.toast('Produit sans valeurs nutritionnelles : complète-les');
+    else if (r.missing === 'unknown') app.toast(unknownMsg);
+  }
+
+  function lookupBarcode(code, meal) {
+    return findBarcode(code).then(function (r) {
+      if (r.food) {
+        if (!r.known) Store.put('FOODS', r.food);
+        return openQty(r.food, { meal: meal });
+      }
+      missingToast(r, 'Produit inconnu : crée-le une fois');
+      openCreate({ meal: meal, barcode: code, name: r.name });
+    });
+  }
+
+  /** « Mes aliments » → nouveau produit par code-barre : fiche préremplie (pour 100 g) à vérifier, puis enregistrée. */
+  function scanNewProduct() {
+    Scanner.open(function (code) {
+      return findBarcode(code).then(function (r) {
+        if (r.known) { app.toast('Déjà dans ta base'); return openCreate({ food: r.food }); }
+        if (r.food) return openCreate({ prefill: r.food });
+        missingToast(r, 'Produit inconnu : saisis ses valeurs pour 100 g');
+        openCreate({ barcode: code, name: r.name });
+      });
+    }, { back: openFoods });
   }
 
   // ---------------------------------------------------------------- quantité
@@ -3999,25 +4044,31 @@ Views.food = (function () {
 
   // ---------------------------------------------------------------- produit perso
 
+  /**
+   * Fiche produit. opts : food (modifier un produit de ta base), prefill (produit trouvé par code-barre, à vérifier),
+   * name / barcode (début de saisie), meal (puis l'ajouter à ce repas), onSave(rec) (puis revenir à une recette).
+   */
   function openCreate(opts) {
-    var f = opts.food || {};
+    var editing = !!opts.food;
+    var f = opts.food || opts.prefill || {};
     var val = function (k, d) { return f[k] == null || f[k] === '' ? (d || '') : f[k]; };
     var num = function (k, label, unit) {
       return '<label class="field"><span class="field-label">' + label + '</span><span class="field-box"><input data-k="' + k + '" inputmode="decimal" value="' + U.esc(String(val(k)).replace('.', ',')) + '"><span class="unit">' + unit + '</span></span></label>';
     };
     app.openSheet({
-      title: opts.food ? 'Modifier l\'aliment' : 'Nouveau produit',
-      html: '<label class="field"><span class="field-label">Nom</span><span class="field-box"><input data-k="name" value="' + U.esc(val('name', opts.name)) + '" placeholder="Skyr vanille"' + (opts.food ? '' : ' autofocus') + '></span></label>' +
+      title: editing ? 'Modifier l\'aliment' : 'Nouveau produit',
+      html: '<label class="field"><span class="field-label">Nom</span><span class="field-box"><input data-k="name" value="' + U.esc(val('name', opts.name)) + '" placeholder="Skyr vanille"' + (editing || opts.prefill ? '' : ' autofocus') + '></span></label>' +
         '<div class="fields"><label class="field"><span class="field-label">Marque</span><span class="field-box"><input data-k="brand" value="' + U.esc(val('brand')) + '"></span></label>' +
         '<label class="field"><span class="field-label">Code-barre</span><span class="field-box"><input data-k="barcode" inputmode="numeric" value="' + U.esc(val('barcode', opts.barcode)) + '"></span></label></div>' +
-        '<p class="muted small">Valeurs pour 100 g (lis la colonne « pour 100 g » de l\'étiquette).</p>' +
+        (opts.prefill ? '<p class="muted small">Trouvé sur Open Food Facts : vérifie les valeurs pour 100 g avant d\'enregistrer.</p>'
+          : '<p class="muted small">Valeurs pour 100 g (lis la colonne « pour 100 g » de l\'étiquette).</p>') +
         '<div class="fields">' + num('kcal', 'Calories', 'kcal') + num('p', 'Protéines', 'g') + num('c', 'Glucides', 'g') + num('f', 'Lipides', 'g') +
         num('fiber', 'Fibres', 'g') + num('salt', 'Sel', 'g') + '</div>' +
         '<p class="muted small">Portion (facultatif) : par exemple « pot » = 125 g.</p>' +
         '<div class="fields"><label class="field"><span class="field-label">Nom de la portion</span><span class="field-box"><input data-k="unit" value="' + U.esc(val('unit')) + '" placeholder="pot, œuf, scoop"></span></label>' +
         num('unitG', 'Poids de la portion', 'g') + '</div>' +
-        '<button class="btn primary block" data-ok>' + (opts.food ? 'Enregistrer' : (opts.meal ? 'Créer et ajouter' : 'Créer')) + '</button>' +
-        (opts.food ? '<button class="btn danger block" data-del>Supprimer l\'aliment</button>' : ''),
+        '<button class="btn primary block" data-ok>' + (editing ? 'Enregistrer' : (opts.meal || opts.onSave ? 'Créer et ajouter' : 'Créer')) + '</button>' +
+        (editing ? '<button class="btn danger block" data-del>Supprimer l\'aliment</button>' : ''),
       bind: function (p) {
         p.addEventListener('click', function (e) {
           if (e.target.closest('[data-del]')) {
@@ -4035,6 +4086,7 @@ Views.food = (function () {
             unit: txt('unit'), unitG: n('unitG'), source: f.source || 'perso'
           });
           rec = Store.put('FOODS', rec);
+          if (opts.onSave) return opts.onSave(rec);
           if (opts.meal) return openQty(rec, { meal: opts.meal });
           after('Aliment enregistré');
         });
@@ -4042,24 +4094,34 @@ Views.food = (function () {
     });
   }
 
-  // ---------------------------------------------------------------- repas types
+  // ---------------------------------------------------------------- recettes (onglet MEALS)
 
-  function openTemplates(meal) {
+  /** Liste des recettes. Avec meal : toucher une recette ajoute tous ses aliments à ce repas ; sans : la modifier. */
+  function openRecipes(meal) {
     var groups = Nutri.mealTemplates(Store.list('MEALS'), foods());
     app.openSheet({
-      title: 'Repas types → ' + meal,
-      html: groups.length ? '<ul class="list">' + groups.map(function (g, i) {
-        return '<li><button class="food-row" data-tpl="' + i + '"><span class="entry-name">' + U.esc(g.name) + '</span>' +
-          '<span class="muted small">' + U.nf(g.kcal, 0) + ' kcal · ' + g.items.map(function (x) { return U.esc(x.name) + ' ' + U.nf(x.qty, 0) + ' g'; }).join(', ') + '</span></button></li>';
-      }).join('') + '</ul>' : '<p class="muted">Aucun repas type. Ils viennent du plan de ton coach (onglet MEALS) ou d\'un repas que tu enregistres.</p>',
+      title: meal ? 'Recettes → ' + meal : 'Mes recettes',
+      html: (groups.length ? '<ul class="list">' + groups.map(function (g, i) {
+        return '<li class="vid-row"><button class="food-row" data-tpl="' + i + '"><span class="entry-name">' + U.esc(g.name) + '</span>' +
+          '<span class="muted small">' + U.nf(g.kcal, 0) + ' kcal · P ' + U.nf(g.p, 0) + ' g · ' + g.items.map(function (x) { return U.esc(x.name) + ' ' + U.nf(x.qty, 0) + ' g'; }).join(', ') +
+          (g.own ? '' : ' · plan du coach') + '</span></button>' +
+          (meal && g.own ? '<button class="icon-btn sm" data-edit="' + i + '" aria-label="Modifier la recette">' + app.icon('settings', 'sm') + '</button>' : '') + '</li>';
+      }).join('') + '</ul>' : '<p class="muted">Aucune recette pour l\'instant. Une recette, c\'est un nom et plusieurs aliments avec leur quantité : tu l\'ajoutes ensuite d\'un geste à n\'importe quel repas.</p>') +
+        '<button class="btn soft block" data-new>+ Nouvelle recette</button>',
       bind: function (p) {
         p.addEventListener('click', function (e) {
-          var b = e.target.closest('[data-tpl]');
-          if (!b) return;
+          var b;
+          if (e.target.closest('[data-new]')) return openRecipe(newRecipe(meal));
+          if ((b = e.target.closest('[data-edit]'))) return openRecipe(editRecipe(groups[Number(b.getAttribute('data-edit'))], meal));
+          if (!(b = e.target.closest('[data-tpl]'))) return;
           var g = groups[Number(b.getAttribute('data-tpl'))];
+          if (!meal) {
+            if (g.own) return openRecipe(editRecipe(g));
+            return app.toast('Recette du plan du coach : elle se modifie dans son fichier');
+          }
           var n = 0;
           g.items.forEach(function (it) { if (it.food) { logFood(it.food, it.qty, meal); n++; } });
-          after(n + ' aliments ajoutés à ' + meal);
+          after(n + ' aliment' + (n > 1 ? 's' : '') + ' ajouté' + (n > 1 ? 's' : '') + ' à ' + meal);
         });
       }
     });
@@ -4102,7 +4164,9 @@ Views.food = (function () {
     app.openSheet({
       title: 'Mes aliments',
       html: '<div class="search"><input class="input" type="search" placeholder="Rechercher" data-q></div><div data-results></div>' +
-        '<button class="btn soft block" data-new>+ Nouveau produit</button>',
+        '<h3 class="list-title">Nouveau produit</h3><div class="tool-row">' +
+        '<button class="btn soft" data-new="scan">' + app.icon('scan', 'sm') + ' Scanner un code-barre</button>' +
+        '<button class="btn soft" data-new="manual">' + app.icon('plus', 'sm') + ' Saisir à la main</button></div>',
       bind: function (p) {
         var input = p.querySelector('[data-q]');
         var draw = function () {
@@ -4115,59 +4179,128 @@ Views.food = (function () {
         p.addEventListener('click', function (e) {
           var b = e.target.closest('[data-food]');
           if (b) return openCreate({ food: foodById(b.getAttribute('data-food')) });
-          if (e.target.closest('[data-new]')) openCreate({});
+          if ((b = e.target.closest('[data-new]'))) return b.getAttribute('data-new') === 'scan' ? scanNewProduct() : openCreate({ name: input.value.trim() });
         });
       }
     });
   }
 
-  // ---------------------------------------------------------------- recette
+  // ---------------------------------------------------------------- recette : nom + aliments et quantités
 
-  function openRecipe() {
-    var items = [];
+  var recipeDraft = null; // recette en cours : retrouvée si sa feuille se ferme (scanner, fiche produit…)
+
+  function newRecipe(meal) {
+    var d = recipeDraft && !recipeDraft.key ? recipeDraft : { key: '', name: '', items: [], ids: [] };
+    d.meal = meal;
+    return d;
+  }
+
+  function editRecipe(g, meal) {
+    return { key: g.key, name: g.name, meal: meal, ids: g.ids.slice(),
+      items: g.items.filter(function (it) { return it.food; }).map(function (it) { return { food: it.food, qty: it.qty }; }) };
+  }
+
+  function openRecipe(d) {
+    recipeDraft = d;
+    var online = [];
+    var back = function () { openRecipe(d); };
+    var addItem = function (food) {
+      if (!foodById(food.id)) Store.put('FOODS', food); // produit en ligne ou scanné : gardé dans ta base
+      d.items.push({ food: food, qty: Number(food.unitG) || 100 });
+    };
     app.openSheet({
-      title: 'Nouvelle recette',
-      html: '<label class="field"><span class="field-label">Nom</span><span class="field-box"><input data-name placeholder="Bolognaise meal prep" autofocus></span></label>' +
-        '<h3 class="list-title">Ingrédients (poids cru)</h3><ul class="list" data-items></ul>' +
-        '<div class="search"><input class="input" type="search" placeholder="Ajouter un ingrédient" data-q></div><ul class="list" data-results></ul>' +
-        '<label class="field"><span class="field-label">Poids total une fois cuit (facultatif)</span><span class="field-box"><input data-cooked inputmode="decimal" placeholder="Pèse la casserole sans le récipient"><span class="unit">g</span></span></label>' +
+      title: d.key ? 'Modifier la recette' : 'Nouvelle recette',
+      html: '<label class="field"><span class="field-label">Nom de la recette</span><span class="field-box"><input data-name value="' + U.esc(d.name) + '" placeholder="Bol de skyr, riz poulet…"' + (d.name ? '' : ' autofocus') + '></span></label>' +
+        '<h3 class="list-title">Aliments et quantités</h3><ul class="list" data-items></ul>' +
         '<div class="preview" data-preview></div>' +
-        '<button class="btn primary block" data-ok>Créer la recette</button>',
+        '<div class="search"><input class="input" type="search" placeholder="Ajouter un aliment de ta base" autocomplete="off" data-q></div>' +
+        '<div data-results></div>' +
+        '<button class="btn soft block" data-scan>' + app.icon('scan', 'sm') + ' Scanner un produit</button>' +
+        '<button class="btn primary block" data-ok>' + (d.key ? 'Enregistrer' : 'Créer la recette') + '</button>' +
+        (d.key ? '<button class="btn danger block" data-del>Supprimer la recette</button>' : ''),
       bind: function (p) {
         var input = p.querySelector('[data-q]');
+        var results = p.querySelector('[data-results]');
         var draw = function () {
-          p.querySelector('[data-items]').innerHTML = items.map(function (it, i) {
-            return '<li class="ing"><span class="entry-name">' + U.esc(it.food.name) + '</span><input inputmode="decimal" data-ing="' + i + '" value="' + it.qty + '"><span class="unit">g</span><button class="icon-btn small-btn" data-rm="' + i + '">✕</button></li>';
-          }).join('');
-          var r = Nutri.recipe('x', items, U.parseNum(p.querySelector('[data-cooked]').value));
-          p.querySelector('[data-preview]').innerHTML = r ? '<b>' + U.nf(r.kcal, 0) + ' kcal / 100 g</b><span>P ' + U.nf(r.p) + '</span><span>G ' + U.nf(r.c) + '</span><span>L ' + U.nf(r.f) + '</span>' : '';
+          p.querySelector('[data-items]').innerHTML = d.items.length ? d.items.map(function (it, i) {
+            return '<li class="ing"><span class="entry-name">' + U.esc(displayName(it.food)) + '</span><input inputmode="decimal" data-ing="' + i + '" value="' + U.nf(it.qty, 1).replace(/\s/g, '') + '"><span class="unit">g</span>' +
+              '<button class="icon-btn sm" data-rm="' + i + '" aria-label="Retirer">' + app.icon('x', 'sm') + '</button></li>';
+          }).join('') : '<li class="muted small">Cherche un aliment ci-dessous ou scanne un produit.</li>';
+          drawTotal();
         };
-        input.addEventListener('input', function () {
+        var drawTotal = function () {
+          var t = Nutri.totals(d.items.map(function (it) { return Nutri.forQty(it.food, it.qty); }));
+          var w = d.items.reduce(function (a, it) { return a + (Number(it.qty) || 0); }, 0);
+          p.querySelector('[data-preview]').innerHTML = d.items.length ? '<b>' + U.nf(t.kcal, 0) + ' kcal</b><span>P ' + U.nf(t.p) + ' g</span><span>G ' + U.nf(t.c) + ' g</span><span>L ' + U.nf(t.f) + ' g</span><span>' + U.nf(w, 0) + ' g</span>' : '';
+        };
+        var drawResults = function () {
           var q = input.value.trim();
-          p.querySelector('[data-results]').innerHTML = q ? Nutri.search(foods(), q, 8).map(function (f) { return foodRow(f); }).join('') : '';
-        });
-        p.querySelector('[data-cooked]').addEventListener('input', draw);
+          if (!q) { results.innerHTML = ''; return; }
+          var local = Nutri.search(foods(), q, 8);
+          results.innerHTML = (local.length ? '<ul class="list">' + local.map(function (f) { return foodRow(f); }).join('') + '</ul>' : '<p class="muted small">Aucun résultat dans ta base.</p>') +
+            (online.length ? '<h3 class="list-title">Open Food Facts</h3><ul class="list">' + online.map(function (f) { return foodRow(f); }).join('') + '</ul>'
+              : '<button class="btn ghost block" data-online>Chercher « ' + U.esc(q) + ' » sur Open Food Facts</button>');
+        };
+        var picked = function () {
+          input.value = ''; online = [];
+          drawResults(); draw();
+          var last = p.querySelector('[data-ing="' + (d.items.length - 1) + '"]');
+          if (last) { last.focus(); last.select(); }
+        };
+        input.addEventListener('input', function () { online = []; drawResults(); });
+        p.querySelector('[data-name]').addEventListener('input', function (e) { d.name = e.target.value; });
         p.addEventListener('input', function (e) {
           var el = e.target.closest('[data-ing]');
-          if (el) { items[Number(el.getAttribute('data-ing'))].qty = U.parseNum(el.value) || 0; draw(); }
+          if (el) { d.items[Number(el.getAttribute('data-ing'))].qty = U.parseNum(el.value) || 0; drawTotal(); }
         });
+        draw();
         p.addEventListener('click', function (e) {
           var b;
           if ((b = e.target.closest('[data-food]'))) {
-            items.push({ food: foodById(b.getAttribute('data-food')), qty: 100 });
-            input.value = ''; p.querySelector('[data-results]').innerHTML = '';
-            draw();
+            var id = b.getAttribute('data-food');
+            addItem(foodById(id) || online.filter(function (x) { return x.id === id; })[0]);
+            return picked();
+          }
+          if (e.target.closest('[data-online]')) {
+            var q = input.value.trim();
+            results.querySelector('[data-online]').outerHTML = '<p class="muted small">Recherche en cours…</p>';
+            U.server('api_foodSearch', q).then(function (json) {
+              online = JSON.parse(json || '[]');
+              if (!online.length) app.toast('Aucun produit trouvé en ligne');
+              drawResults();
+            }).catch(function (err) { app.toast(err.message); drawResults(); });
             return;
           }
-          if ((b = e.target.closest('[data-rm]'))) { items.splice(Number(b.getAttribute('data-rm')), 1); draw(); return; }
+          if ((b = e.target.closest('[data-rm]'))) { d.items.splice(Number(b.getAttribute('data-rm')), 1); draw(); return; }
+          if (e.target.closest('[data-scan]')) {
+            return Scanner.open(function (code) {
+              return findBarcode(code).then(function (r) {
+                if (r.food) { addItem(r.food); app.toast('Ajouté : ' + r.food.name); return back(); }
+                missingToast(r, 'Produit inconnu : saisis ses valeurs pour 100 g');
+                openCreate({ barcode: code, name: r.name, onSave: function (rec) { addItem(rec); back(); } });
+              });
+            }, { back: back });
+          }
+          if (e.target.closest('[data-del]')) {
+            if (!window.confirm('Supprimer la recette « ' + d.name + ' » ? Les repas déjà notés ne changent pas.')) return;
+            d.ids.forEach(function (id) { Store.remove('MEALS', id); });
+            recipeDraft = null;
+            return d.meal ? openRecipes(d.meal) : after('Recette supprimée');
+          }
           if (e.target.closest('[data-ok]')) {
-            var name = p.querySelector('[data-name]').value.trim();
-            var r = Nutri.recipe(name, items, U.parseNum(p.querySelector('[data-cooked]').value));
-            if (!name || !items.length || !r) { app.toast('Nom et au moins un ingrédient'); return; }
-            r.id = 'r-' + U.slug(name) + '-' + U.uid().slice(-4);
-            r.unit = 'portion'; r.unitG = '';
-            Store.put('FOODS', r);
-            after('Recette créée : cherche « ' + name + ' » pour l\'ajouter');
+            var name = d.name.trim();
+            if (!name) { app.toast('Donne un nom à la recette'); return; }
+            if (!d.items.some(function (it) { return Number(it.qty) > 0; })) { app.toast('Ajoute au moins un aliment avec sa quantité'); return; }
+            var twin = Nutri.mealTemplates(Store.list('MEALS'), foods()).filter(function (g) { return g.key !== d.key && Nutri.norm(g.name) === Nutri.norm(name); })[0];
+            if (twin) { app.toast('Une recette porte déjà ce nom'); return; }
+            var key = d.key || 'rc-' + U.slug(name) + '-' + U.uid().slice(-4);
+            var rows = Nutri.recipeRows(key, name, d.items);
+            var keep = rows.map(function (r) { return r.id; });
+            d.ids.forEach(function (id) { if (keep.indexOf(id) < 0) Store.remove('MEALS', id); });
+            rows.forEach(function (r) { Store.put('MEALS', r); });
+            recipeDraft = null;
+            if (d.meal) { app.toast(d.key ? 'Recette enregistrée' : 'Recette créée : touche-la pour l\'ajouter'); return openRecipes(d.meal); }
+            after(d.key ? 'Recette enregistrée' : 'Recette créée');
           }
         });
       }
@@ -4427,7 +4560,8 @@ var Scanner = (function () {
 
   /**
    * onCode(code) est appelé une seule fois, avec les chiffres du code-barre.
-   * ctx = { meal, date } : transmis au scanner externe pour le retour par l'adresse de l'app.
+   * ctx = { meal, date } : transmis au scanner externe pour le retour par l'adresse de l'app ;
+   * ctx.back : bouton « Retour » vers la feuille d'avant (recette en cours…).
    */
   function open(onCode, ctx) {
     ctx = ctx || {};
@@ -4454,7 +4588,8 @@ var Scanner = (function () {
       html: '<div class="scan-box"><video playsinline muted data-video></video><div class="scan-frame"></div><p class="scan-status" data-status>Ouverture de la caméra…</p></div>' +
         (external ? '<button class="btn primary block" data-external hidden>' + App.icon('scan') + 'Scanner avec la caméra</button>' : '') +
         '<label class="btn soft block file-btn">Prendre une photo du code-barre<input type="file" accept="image/*" capture="environment" data-photo hidden></label>' +
-        '<div class="manual"><input class="input" inputmode="numeric" placeholder="Ou tape les chiffres du code" data-manual><button class="btn primary" data-go>OK</button></div>',
+        '<div class="manual"><input class="input" inputmode="numeric" placeholder="Ou tape les chiffres du code" data-manual><button class="btn primary" data-go>OK</button></div>' +
+        (ctx.back ? '<button class="btn ghost block" data-back>Retour</button>' : ''),
       onClose: stop,
       bind: function (p) {
         var video = p.querySelector('[data-video]');
@@ -4504,6 +4639,7 @@ var Scanner = (function () {
           } else off('Caméra en direct indisponible ici : prends une photo du code-barre ou tape ses chiffres.');
         });
         if (external) p.querySelector('[data-external]').addEventListener('click', function () { stop(); openExternal(onCode, ctx); });
+        if (ctx.back) p.querySelector('[data-back]').addEventListener('click', function () { stop(); ctx.back(); });
 
         p.querySelector('[data-photo]').addEventListener('change', function (e) {
           var file = e.target.files && e.target.files[0];
