@@ -1231,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 00:12 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 00:25 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3085,18 +3085,22 @@ Views.today = (function () {
   function summaryHtml(date) {
     var daily = Store.list('DAILY');
     var day = dayRecord(date);
-    var score = Calc.readiness(day);
-    var base = Calc.readinessBaseline(daily, date, U.addDays);
     var trend = Calc.weightTrend(daily, date, U.addDays);
     var plan = Calc.dayPlan(Store.list('SETTINGS'), U.dow(date));
     var target = Calc.targetFor(Store.list('TARGETS'), date);
     var stepsGoal = (target && target.steps) || plan.steps;
-    var diff = score !== null && base !== null ? Calc.round(score - base, 1) : null;
-    var formeNote = score === null ? 'Remplis le check-in' : diff === null ? 'Moyenne dispo après 4 jours notés'
-      : (diff <= -3 ? '<b class="neg">' + U.signed(diff) + '</b> vs ta moyenne 14 j' : U.signed(diff) + ' vs ta moyenne 14 j');
+    // Sommeil : moyenne des nuits notées depuis lundi (jusqu'au jour affiché).
+    var nights = [];
+    for (var i = U.dow(date) - 1; i >= 0; i--) {
+      var r = i ? Store.get('DAILY', U.addDays(date, -i)) : day;
+      if (r && typeof r.sleepH === 'number') nights.push(r.sleepH);
+    }
+    var sleepAvg = nights.length ? Calc.mean(nights) : null;
+    var sleepNote = !nights.length ? 'Note tes heures le matin'
+      : 'Moyenne depuis lundi · ' + nights.length + ' nuit' + (nights.length > 1 ? 's' : '');
     var status = Calc.gainStatus(trend.pct);
     return '<div class="tiles">' +
-      '<div class="tile"><span class="tile-label">Forme</span><span class="tile-value">' + (score === null ? '–' : U.nf(score)) + '<small>/25</small></span><span class="tile-note">' + formeNote + '</span></div>' +
+      '<div class="tile"><span class="tile-label">Sommeil</span><span class="tile-value">' + U.nf(sleepAvg) + '<small>h</small></span><span class="tile-note">' + sleepNote + '</span></div>' +
       '<div class="tile"><span class="tile-label">Poids moyen 7 j</span><span class="tile-value">' + U.nf(trend.avg) + '<small>kg</small></span><span class="tile-note">' +
         (trend.delta === null ? 'Tendance après 2 semaines' : U.signed(trend.delta, 2) + ' kg / sem.' + (status ? ' · <span class="' + status.key + '">' + status.text + '</span>' : '')) + '</span></div>' +
       '<div class="tile"><span class="tile-label">Pas</span><span class="tile-value">' + (day.steps ? U.nf(day.steps, 0) : '–') + '</span><span class="tile-note">' + (stepsGoal ? 'Objectif ' + U.nf(stepsGoal, 0) : '') + '</span></div>' +
