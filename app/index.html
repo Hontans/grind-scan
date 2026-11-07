@@ -1231,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 00:25 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 00:33 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2900,6 +2900,7 @@ var Store = (function () {
   var queue = {};      // { TABLE: { id: record } }
   var dels = {};       // { TABLE: { id: true } }
   var inflight = null;
+  var syncs = 0;       // nombre d'envois commencés : une lecture du Sheet faite pendant un envoi est périmée
   var timer = null, retryMs = 0;
   var listeners = [];
   var status = { pending: 0, syncing: false, error: null, lastSync: null };
@@ -2998,6 +2999,7 @@ var Store = (function () {
       sent.del[t] = ds;
     });
     inflight = sent;
+    syncs++;
     status.syncing = true;
     persist();
     google.script.run
@@ -3035,6 +3037,8 @@ var Store = (function () {
     init: init, put: put, remove: remove, local: local, flush: flush, list: list, get: get,
     data: function () { return data; },
     status: function () { return status; },
+    syncs: function () { return syncs; },
+    busy: function () { return !!inflight; },
     onChange: function (fn) { listeners.push(fn); }
   };
 })();
@@ -3494,7 +3498,7 @@ Views.train = (function () {
       '<div class="ex-head-text"><button class="ex-title" data-ex="' + U.esc(p.exercise) + '"><h2>' + U.esc(p.exercise) + '</h2></button>' +
       '<div class="ex-meta"><span class="chip">' + U.esc((p.sets || '?') + ' × ' + (p.reps || '?')) + (p.rest ? ' · ' + U.esc(p.rest) : '') + '</span><span class="muted small">' + U.esc(muscle) + '</span></div>' +
       '<button class="ex-video" data-video="' + U.esc(p.exercise) + '">' + App.icon('video', 'sm') + (vids ? 'Mes vidéos (' + vids + ')' : 'Ajouter une vidéo') + '</button></div></div>' +
-      (p.cue ? '<details class="cue"><summary>Consignes</summary><p>' + U.esc(p.cue) + '</p>' + (p.links ? String(p.links).split(' ').map(function (l) { return '<a href="' + U.esc(l) + '" target="_blank" rel="noopener">Vidéo</a>'; }).join(' ') : '') + '</details>' : '') +
+      (p.cue ? '<details class="cue"><summary>Consignes</summary><p>' + U.esc(p.cue) + '</p>' + (p.links ? String(p.links).split(/\s+/).filter(function (l) { return /^https?:\/\//i.test(l); }).map(function (l) { return '<a href="' + U.esc(l) + '" target="_blank" rel="noopener">Vidéo</a>'; }).join(' ') : '') + '</details>' : '') +
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + prev.sets.map(fmtSet).join(' · ') + '</p>' : '<p class="muted small">Première fois sur cet exercice.</p>') +
       (sug ? '<p class="tip">' + U.esc(sug.text) + '</p>' : '') +
       '<div class="sets">' + rows + '</div>' +
@@ -3565,6 +3569,8 @@ Views.train = (function () {
     if (w.preview) { w = start(w.session, true); started = true; } // première série validée : la séance démarre
     var before = Train.best(sets(), p.exercise, id);
     Store.put('SETS', { id: id, date: w.date, sessionId: w.sessionId, session: w.session, exercise: p.exercise, setNo: n, reps: reps, load: load });
+    // La séance existe dès sa première série : comptée dans Aujourd'hui et le bilan même sans « Terminer ».
+    if (!Store.get('SESSIONS', w.sessionId)) Store.put('SESSIONS', { id: w.sessionId, date: w.date, name: w.session });
     repsEl.value = reps; loadEl.value = load == null ? '' : String(load).replace('.', ',');
     row.classList.remove('just');
     void row.offsetWidth;
@@ -4076,6 +4082,8 @@ Views.food = (function () {
       bind: function (p) {
         p.addEventListener('click', function (e) {
           if (e.target.closest('[data-del]')) {
+            var used = Store.list('MEALS').filter(function (m) { return m.foodId === f.id; }).length;
+            if (used && !window.confirm('Cet aliment est utilisé dans ' + used + ' recette' + (used > 1 ? 's' : '') + ' : il en disparaîtra. Le supprimer quand même ?')) return;
             Store.remove('FOODS', f.id);
             return after('Aliment supprimé');
           }
@@ -6431,8 +6439,11 @@ window.Views = Views;
   function refresh() {
     if (!WEB || !WEB.api || loading) return;
     loading = true;
+    var syncsBefore = Store.syncs();
     U.server('api_boot').then(function (json) {
       loading = false; lastBoot = Date.now();
+      // Un envoi est parti pendant la lecture : ces données ne le contiennent peut-être pas, on relira après.
+      if (Store.busy() || Store.syncs() !== syncsBefore) { lastBoot = 0; setTimeout(refresh, 4000); return; }
       var before = JSON.stringify(Store.data());
       Store.init(JSON.parse(json));
       if (JSON.stringify(Store.data()) === before) return;
