@@ -2,7 +2,7 @@
 <defs>
   <radialGradient id="bg" cx="50%" cy="38%" r="75%"><stop offset="0" stop-color="#131A29"/><stop offset=".6" stop-color="#090B11"/><stop offset="1" stop-color="#05060A"/></radialGradient>
   <radialGradient id="pool" cx="50%" cy="100%" r="60%"><stop offset="0" stop-color="#4D8DFF" stop-opacity=".22"/><stop offset="1" stop-color="#4D8DFF" stop-opacity="0"/></radialGradient>
-  <linearGradient id="glass" gradientUnits="userSpaceOnUse" x1="0" y1="220" x2="0" y2="800"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#AEB9CE"/></linearGradient>
+  <linearGradient id="area" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="790"><stop offset="0" stop-color="#4D8DFF" stop-opacity=".55"/><stop offset="1" stop-color="#4D8DFF" stop-opacity="0"/></linearGradient>
   <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <filter id="dot" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="18" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   <clipPath id="sq"><rect width="1024" height="1024" rx="228"/></clipPath>
@@ -10,12 +10,11 @@
 <g clip-path="url(#sq)">
   <rect width="1024" height="1024" fill="url(#bg)"/>
   <rect width="1024" height="1024" fill="url(#pool)"/>
-  <g fill="url(#glass)">
-    <rect x="196" y="650" width="190" height="150" rx="30"/><rect x="406" y="560" width="190" height="240" rx="30"/><rect x="616" y="470" width="190" height="330" rx="30"/>
-  </g>
-  <path d="M 170 560 C 290 530 360 470 440 420 C 540 356 640 250 820 190" fill="none" stroke="#4D8DFF" stroke-width="46" stroke-linecap="round" filter="url(#glow)"/>
-  <path d="M 170 560 C 290 530 360 470 440 420 C 540 356 640 250 820 190" fill="none" stroke="#E3ECFF" stroke-width="20" stroke-linecap="round"/>
-  <circle cx="820" cy="190" r="40" fill="#4D8DFF" filter="url(#dot)"/>
-  <circle cx="820" cy="190" r="23" fill="#F2F6FF"/>
+  <path d="M 220 690 C 330 680 380 560 470 560 C 570 560 600 420 680 380 C 740 350 770 300 804 250 L 804 790 L 220 790 Z" fill="url(#area)"/>
+  <path d="M 220 790 L 804 790" stroke="#C9D3E6" stroke-opacity=".35" stroke-width="22" stroke-linecap="round"/>
+  <path d="M 220 690 C 330 680 380 560 470 560 C 570 560 600 420 680 380 C 740 350 770 300 804 250" fill="none" stroke="#4D8DFF" stroke-width="46" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 220 690 C 330 680 380 560 470 560 C 570 560 600 420 680 380 C 740 350 770 300 804 250" fill="none" stroke="#E3ECFF" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="804" cy="250" r="40" fill="#4D8DFF" filter="url(#dot)"/>
+  <circle cx="804" cy="250" r="23" fill="#F2F6FF"/>
 </g>
 </svg>
