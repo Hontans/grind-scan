@@ -1228,6 +1228,25 @@ table.data tbody tr { cursor: pointer; }
 [data-prog] .picker { margin-bottom: 10px; }
 .prog-seg { margin-bottom: 12px; }
 .prog-seg button { font-size: 13.5px; padding: 0 2px; }
+/* Série de jours dans la cible (bilan de la semaine) */
+.streak { display: grid; gap: 10px; padding: 12px 13px; margin-bottom: 8px; border-radius: 20px; background: var(--field); }
+.streak-head { display: flex; align-items: center; gap: 11px; }
+.streak-flame { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; color: var(--text-2); background: var(--card); }
+.streak-flame .icon { width: 22px; height: 22px; stroke-width: 2; }
+.streak.on .streak-flame { color: var(--accent-ink); background: var(--accent-grad); }
+.streak.on .streak-flame .icon { fill: currentColor; fill-opacity: .3; }
+.streak-txt { display: grid; gap: 1px; min-width: 0; flex: 1; }
+.streak-txt b { font: 600 17px/1.2 var(--font); }
+.streak-best { display: grid; justify-items: end; flex: none; }
+.streak-best b { font: 600 17px/1.2 var(--font); font-variant-numeric: tabular-nums; }
+.streak-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.streak-day { display: grid; justify-items: center; gap: 3px; }
+.streak-day i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--line); }
+.streak-day i .icon { width: 16px; height: 16px; stroke-width: 2.4; }
+.streak-day.ok i { border-color: transparent; color: var(--accent-ink); background: var(--accent-grad); }
+.streak-day.pending i { border-style: dashed; border-color: var(--accent); }
+.streak-day.future i { opacity: .4; }
+.streak-day small { font-size: 11px; color: var(--text-2); }
 .stats.three { grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; }
 .stats.three .stat { padding: 10px 11px; }
 .stats.three .stat b { font-size: 16px; }
@@ -1283,7 +1302,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 21:06 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 21:19 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2994,6 +3013,31 @@ var Review = (function () {
     };
   }
 
+  /**
+   * Série façon Duolingo : jours réussis d'affilée jusqu'à aujourd'hui.
+   * Aujourd'hui pas encore réussi ne casse pas la série (la journée n'est pas finie).
+   * ok(date) → bool ; on remonte au plus `maxDays` jours. Renvoie { current, best, today }.
+   */
+  function streak(ok, today, addDays, maxDays) {
+    maxDays = maxDays || 400;
+    var todayOk = !!ok(today), current = 0, best = 0, run = 0, counting = true;
+    for (var i = 0; i < maxDays; i++) {
+      var d = addDays(today, -i);
+      if (ok(d)) { run++; if (counting) current++; }
+      else { if (i > 0) counting = false; run = 0; }
+      if (run > best) best = run;
+    }
+    return { current: current, best: best, today: todayOk };
+  }
+
+  /** Jour réussi : repas saisis (plus de 500 kcal) à ±10 % de l'objectif calories. */
+  function onTargetDay(intake, kcalTarget) {
+    return function (d) {
+      var x = intake[d], t = kcalTarget ? kcalTarget(d) : null;
+      return !!(x && x.kcal > 500 && isNum(t) && t > 0 && Math.abs(x.kcal - t) / t <= 0.1);
+    };
+  }
+
   function plural(n, word) { return n + ' ' + word + (n > 1 ? 's' : ''); }
 
   /** Texte du bilan, prêt à coller dans un message au coach. */
@@ -3012,7 +3056,7 @@ var Review = (function () {
     return lines.join('\n');
   }
 
-  return { intakeByDay: intakeByDay, weightSlope: weightSlope, tdee: tdee, suggestedKcal: suggestedKcal, week: week, reportText: reportText };
+  return { intakeByDay: intakeByDay, weightSlope: weightSlope, tdee: tdee, suggestedKcal: suggestedKcal, week: week, reportText: reportText, streak: streak, onTargetDay: onTargetDay };
 })();
 </script>
 
@@ -5665,13 +5709,35 @@ Views.trends = (function () {
     return { from: from, to: U.addDays(from, 6) };
   }
 
+  function kcalTarget(d) {
+    var t = Calc.targetFor(Store.list('TARGETS'), d);
+    if (!t) return null;
+    return Calc.dayPlan(Store.list('SETTINGS'), U.dow(d)).on ? t.kcalOn : (t.kcalOff || t.kcalOn);
+  }
+
+  /** Série de jours dans la cible calories : en cours, record, et les 7 jours de la semaine affichée. */
+  function streakBlock(r) {
+    var today = U.today();
+    var ok = Review.onTargetDay(Review.intakeByDay(Store.list('FOOD_LOG')), kcalTarget);
+    var st = Review.streak(ok, today, U.addDays, 400);
+    var dots = '', n = 0;
+    for (var d = r.from; d <= r.to; d = U.addDays(d, 1)) {
+      var cls = d > today ? 'future' : ok(d) ? 'ok' : d === today ? 'pending' : 'miss';
+      if (cls === 'ok') n++;
+      dots += '<span class="streak-day ' + cls + '"><i>' + (cls === 'ok' ? App.icon('check') : '') + '</i><small>' + 'LMMJVSD'.charAt(U.dow(d) - 1) + '</small></span>';
+    }
+    var title = st.current ? st.current + ' jour' + (st.current > 1 ? 's' : '') + ' d\'affilée' : 'Pas de série en cours';
+    var hint = st.current && !st.today ? 'Reste dans la cible aujourd\'hui' :
+      !st.current ? 'Calories à ±10 % de l\'objectif pour la lancer' : 'Calories à ±10 % de l\'objectif';
+    return '<div class="streak' + (st.current ? ' on' : '') + '">' +
+      '<div class="streak-head"><span class="streak-flame">' + App.icon('flame') + '</span>' +
+      '<div class="streak-txt"><b>' + title + '</b><span class="muted small">' + hint + '</span></div>' +
+      '<div class="streak-best"><b>' + st.best + ' j</b><span class="muted small">record</span></div></div>' +
+      '<div class="streak-week" aria-label="' + n + ' jour' + (n > 1 ? 's' : '') + ' réussi' + (n > 1 ? 's' : '') + ' cette semaine">' + dots + '</div></div>';
+  }
+
   function weekSummary(offset) {
     var r = weekRange(offset);
-    var kcalTarget = function (d) {
-      var t = Calc.targetFor(Store.list('TARGETS'), d);
-      if (!t) return null;
-      return Calc.dayPlan(Store.list('SETTINGS'), U.dow(d)).on ? t.kcalOn : (t.kcalOff || t.kcalOn);
-    };
     var w = Review.week({ daily: Store.list('DAILY'), sessions: Store.list('SESSIONS'), log: Store.list('FOOD_LOG'),
       plannedSessions: plannedPerWeek(), kcalTarget: kcalTarget, today: U.today() }, r.from, r.to, U.addDays);
     w.label = U.shortDate(r.from) + ' au ' + U.shortDate(r.to);
@@ -5686,6 +5752,7 @@ Views.trends = (function () {
         (diff !== null && Math.abs(diff) > 0 ? '<span class="muted small">' + U.signed(diff, dec) + ' vs sem. préc.</span>' : '<span class="muted small">&nbsp;</span>') + '</div>';
     };
     return '<section class="card"><div class="card-head"><h2>Bilan de la semaine</h2><span class="muted small">' + w.label + '</span></div>' +
+      streakBlock(weekRange(0)) +
       '<div class="stats">' +
       cell('Poids moyen', w.weight, prev.weight, 'kg', 2) +
       '<div class="stat"><span class="tile-label">Séances</span><b>' + w.sessionsDone + (w.sessionsPlanned ? ' / ' + w.sessionsPlanned : '') + '</b><span class="muted small">&nbsp;</span></div>' +
@@ -5898,7 +5965,8 @@ window.Views = Views;
     flag: '<path d="M5.5 20.5v-16M5.5 5h11l-2 4 2 4h-11"/>',
     video: '<rect x="3.5" y="6.5" width="12" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3"/>',
     play: '<path d="M8 5.5v13l10.5-6.5L8 5.5Z"/>',
-    trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>'
+    trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>',
+    flame: '<path d="M12 21c-3.6 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.7 2.3 3.3.2-2.9 1.6-5.5 3.6-7 .2 2.6 1.4 4.3 2.6 6 .8 1.2 1.4 2.5 1.4 4.3 0 4-2.9 7.2-7 7.2Z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.4-2.6 2.1-4 .9.9 2.1 1.8 2.9 3 .3.4.5.9.5 1.4 0 1.3-1.2 2.4-2.7 2.4Z"/>'
   };
   function icon(name, cls) {
     return '<svg class="icon ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (PATHS[name] || '') + '</svg>';
