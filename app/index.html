@@ -540,6 +540,35 @@ svg { display: block; }
 /* l'onde autour du point : agrandie et non redessinée, elle ne sollicite pas le processeur */
 .tabbar .live::before { background: var(--accent-line); animation: live 2s var(--ease-out) infinite; }
 @keyframes live { 0% { transform: scale(1); opacity: 1; } 70%, 100% { transform: scale(2.75); opacity: 0; } }
+.tab-l { display: none; }
+/*
+ * Variante « Gouttes » (Réglages) : une goutte de verre par onglet, dessinée par le moteur.
+ * L'onglet actif s'étire en pilule teintée et montre son nom ; le verre suit l'étirement,
+ * et pendant le trajet les gouttes voisines se touchent un instant par un col.
+ */
+.tabbar nav.split {
+  display: flex; justify-content: center; align-items: center; gap: 22px; padding: 0;
+  background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.tabbar nav.split button {
+  flex: none; width: 52px; height: 52px; padding: 0;
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  opacity: .82; overflow: hidden; white-space: nowrap;
+  transition: opacity .25s; /* la taille change d'un coup : c'est le verre, sur ses ressorts, qui fait le mouvement */
+}
+.tabbar nav.split button[aria-current="page"] { width: 118px; gap: 7px; opacity: 1; color: var(--on-accent); }
+.tabbar nav.split .tab-l {
+  display: block; max-width: 0; opacity: 0; font: 600 14.5px/1 var(--font); letter-spacing: -.01em;
+  transition: opacity .12s;
+}
+.tabbar nav.split button[aria-current="page"] .tab-l { max-width: 80px; opacity: 1; transition: opacity .3s ease .22s; }
+.tabbar nav.split button:active { transform: none; }
+.sheet-open .tabbar nav.split button { opacity: 0; }
+@media (max-width: 359px) {
+  .tabbar nav.split { gap: 18px; }
+  .tabbar nav.split button { width: 44px; height: 44px; }
+  .tabbar nav.split button[aria-current="page"] { width: 96px; gap: 5px; }
+}
 .sheet-open .tabbar button { opacity: 0; pointer-events: none; transition: opacity .16s; }
 .sheet-open .tabbar nav { pointer-events: none; }
 .sheet-open .dock, .sheet-open .save-bar { opacity: 0; pointer-events: none; transition: opacity .16s; }
@@ -1232,7 +1261,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 01:44 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 01:55 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1574,7 +1603,7 @@ window.Liquid = (function () {
 
   // ---------------------------------------------------------------- shader
 
-  var N = 8;
+  var N = 12; // en-tête (3), barre (capsule, ou 4 gouttes et la pilule), minuteur, feuille, notification, et celles qui se replient
   var VERT = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
   var FRAG = [
     '#ifdef GL_FRAGMENT_PRECISION_HIGH',
@@ -1889,9 +1918,11 @@ window.Liquid = (function () {
       error:  { frost: .5, tint: RED, a: .86 }
     }
   };
+  // Pilule de l'onglet actif (barre en gouttes) : même matière que les boutons accentués, ressort plus souple pour voyager.
+  MAT.dark.pill = MAT.dark.accent; MAT.light.pill = MAT.light.accent;
   // Ressorts : raideur et amortissement. Peu amortis pour les gouttes, plus posés pour les grandes formes.
   var SPRING = {
-    nav:    [240, .68], head: [230, .66], circle: [260, .56], dock: [150, .56],
+    nav:    [240, .68], head: [230, .66], pill: [150, .6], circle: [260, .56], dock: [150, .56],
     toast:  [165, .58], sheet: [170, .74], accent: [170, .58], error: [165, .58]
   };
 
@@ -1937,6 +1968,7 @@ window.Liquid = (function () {
       s.removing = false;
       s.role = role;
       if (o.radius != null) s.radius = o.radius;
+      if (o.from) s.from = o.from;
       setTargetsFromEl(s);
       setMaterial(s);
       if (reduce) snap(s);
@@ -2174,9 +2206,10 @@ window.Liquid = (function () {
       // La vitesse étire la forme dans le sens du mouvement et la tasse dans l'autre.
       var sx = clamp01(Math.abs(s.cx.v) / 1500), sy = clamp01(Math.abs(s.cy.v) / 1500), p = s.p.x;
       // Une feuille ouverte a englouti la capsule : celle-ci se retire pour ne pas faire gonfler ses bords.
-      var sunk = s.id === 'nav' || s.id === 'dock' ? swallowed.x : 0;
-      var w = Math.max(0, s.w.x * (1 + .12 * sx - .08 * sy) + p * 8 - sunk * 56);
-      var hh = Math.max(0, s.h.x * (1 + .12 * sy - .08 * sx) + p * 8 - sunk * 34);
+      var drop = s.id.indexOf('tab:') === 0; // gouttes de la barre d'onglets : englouties comme la capsule
+      var sunk = s.id === 'nav' || s.id === 'dock' || drop ? swallowed.x : 0;
+      var w = Math.max(0, s.w.x * (1 + .12 * sx - .08 * sy) + p * 8 - sunk * (drop ? s.w.x : 56));
+      var hh = Math.max(0, s.h.x * (1 + .12 * sy - .08 * sx) + p * 8 - sunk * (drop ? s.h.x : 34));
       var r = Math.max(0, Math.min(s.r.x + p * 4, Math.min(w, hh) / 2));
       if (w < 1 || hh < 1) return;
       var k = n * 4, c3 = n * 3; // formes rangées sans trou : le shader s'arrête à la première vide
@@ -5994,6 +6027,16 @@ window.Views = Views;
     }
     nav.addEventListener('pointerdown', function (e) {
       if (e.button) return;
+      if (splitNav()) { // gouttes : celle sous le doigt enfle, pas de glissé
+        var tb = e.target.closest('[data-tab]');
+        if (!tb) return;
+        var gid = tb.getAttribute('data-tab') === state.tab ? 'tab:sel' : 'tab:' + tb.getAttribute('data-tab');
+        Glass.press(gid, true);
+        var up = function () { Glass.press(gid, false); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
+        return;
+      }
       drag = e.pointerId;
       moved = false;
       x0 = e.clientX;
@@ -6025,7 +6068,7 @@ window.Views = Views;
   function renderNav(restarted) {
     if (!$nav.firstChild) {
       $nav.innerHTML = '<div class="tabbar"><nav aria-label="Navigation" data-glass="nav"><span class="ind" aria-hidden="true"></span>' + TABS.map(function (t) {
-        return '<button data-tab="' + t.id + '" aria-label="' + t.label + '"><span>' + icon(t.id) + '</span></button>';
+        return '<button data-tab="' + t.id + '" aria-label="' + t.label + '"><span>' + icon(t.id) + '</span><b class="tab-l" aria-hidden="true">' + t.label + '</b></button>';
       }).join('') + '</nav></div>';
       var n = $nav.querySelector('nav');
       bindNavDrag(n);
@@ -6039,6 +6082,10 @@ window.Views = Views;
     // Sans recalcul entre-temps (aucune mesure faite), il faut le forcer pour relancer l'animation.
     var reflow = moved && !(restarted && (Glass.on || $scroll.querySelector('.fr-w')));
     if (moved) { ind.classList.remove('move'); if (reflow) void ind.offsetWidth; ind.classList.add('move'); }
+    // Gouttes : les icônes changent de place d'un coup avec la mise en page ; on les fait glisser
+    // de l'ancienne à la nouvelle (FLIP), au rythme du verre, pour qu'elles restent dans leur goutte.
+    var glide = moved && splitNav() && nav.classList.contains('split');
+    var icons = glide ? Array.prototype.map.call(nav.querySelectorAll('[data-tab] > span'), function (s) { return [s, s.getBoundingClientRect().left]; }) : null;
     nav.querySelectorAll('[data-tab]').forEach(function (b) {
       var on = b.getAttribute('data-tab') === state.tab;
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
@@ -6046,9 +6093,41 @@ window.Views = Views;
       // point animé sur Séance quand une séance est en cours ailleurs
       b.firstChild.className = b.getAttribute('data-tab') === 'train' && live && state.tab !== 'train' ? 'live' : '';
     });
-    Glass.attach('nav', nav, { role: 'nav', instant: true });
-    Glass.lensTo(nav.querySelector('[aria-current="page"]'));
+    var split = splitNav();
+    nav.classList.toggle('split', split);
+    if (split) {
+      // Gouttes : une goutte de verre par onglet, et une pilule colorée (tab:sel) sur l'onglet actif.
+      // La pilule voyage d'un onglet à l'autre comme la pastille de la capsule, en s'étirant ; la goutte
+      // qu'elle rejoint se fond en elle, et celle qu'elle quitte en ressort par un col, comme les boutons de l'en-tête.
+      var first = !nav.dataset.split;
+      nav.dataset.split = '1';
+      Glass.remove('nav');
+      Glass.lensTo(null);
+      var cur = null;
+      nav.querySelectorAll('[data-tab]').forEach(function (b) {
+        var id = b.getAttribute('data-tab');
+        if (id === state.tab) { cur = b; Glass.remove('tab:' + id); return; }
+        // née dans la pilule (à son ancienne place, encore sa cible), elle s'en détache en rejoignant sa place
+        Glass.attach('tab:' + id, b, { role: 'nav', from: 'tab:sel', radius: 'pill', instant: first });
+      });
+      if (cur) Glass.attach('tab:sel', cur, { role: 'pill', radius: 'pill', instant: first });
+      if (icons) {
+        icons.forEach(function (it) { var dx = it[1] - it[0].getBoundingClientRect().left; it.push(dx); if (Math.abs(dx) > .5) { it[0].style.transition = 'none'; it[0].style.transform = 'translateX(' + dx + 'px)'; } });
+        void nav.offsetWidth;
+        icons.forEach(function (it) { if (Math.abs(it[2]) > .5) { it[0].style.transition = 'transform .62s var(--liquid-soft)'; it[0].style.transform = ''; } });
+      }
+      if (moved) Glass.track(700);
+    } else {
+      delete nav.dataset.split;
+      Glass.prune('tab:', {});
+      Glass.attach('nav', nav, { role: 'nav', instant: true });
+      Glass.lensTo(nav.querySelector('[aria-current="page"]'));
+    }
   }
+  /** Barre d'onglets en gouttes séparées (réglage d'apparence), seulement avec le verre WebGL. */
+  function splitNav() { return look.nav === 'drops' && Glass.on; }
+  /** Forme d'où sortent les feuilles et le minuteur : la capsule, ou la goutte de l'onglet actif. */
+  function navShape() { return splitNav() ? 'tab:sel' : 'nav'; }
 
   // ---------------------------------------------------------------- feuilles
 
@@ -6072,7 +6151,7 @@ window.Views = Views;
     if (cur) {
       cur.parentNode.replaceChild(sh, cur);
       if (!reduceMotion) sh.querySelector('.sheet-body').classList.add('swap-in');
-      Glass.attach('sheet', sh, { role: 'sheet', from: 'nav', morph: true, radius: 36 });
+      Glass.attach('sheet', sh, { role: 'sheet', from: navShape(), morph: true, radius: 36 });
       Glass.track(); // sa hauteur a pu changer : le verre suit en ressort
     } else {
       var bd = document.createElement('div');
@@ -6081,7 +6160,7 @@ window.Views = Views;
       $overlay.appendChild(bd);
       $overlay.appendChild(sh);
       // la capsule d'onglets s'étire jusqu'à devenir la feuille
-      Glass.attach('sheet', sh, { role: 'sheet', from: 'nav', morph: true, radius: 36 });
+      Glass.attach('sheet', sh, { role: 'sheet', from: navShape(), morph: true, radius: 36 });
     }
     decorate(sh);
     sheetCleanup = opts.onClose || null;
@@ -6193,7 +6272,7 @@ window.Views = Views;
       $dock.insertAdjacentHTML('beforeend', '<div class="dock" data-dock="' + kind + '">' + inner + '</div>');
     }
     var el = $dock.querySelector('[data-dock]:not(.out) [data-glass]');
-    if (el) Glass.attach('dock', el, { role: 'dock', from: 'nav' });
+    if (el) Glass.attach('dock', el, { role: 'dock', from: navShape() });
   }
 
   var RING = 2 * Math.PI * 19;
@@ -6291,6 +6370,9 @@ window.Views = Views;
     return '<div class="settings-sec">Apparence</div><div class="seg" data-modes>' + modes.map(function (m) {
       return '<button data-mode="' + m[0] + '" aria-pressed="' + (look.mode === m[0]) + '">' + m[1] + '</button>';
     }).join('') + '</div>' +
+      (Glass.on ? '<div class="settings-sec">Barre d\'onglets</div><div class="seg" data-navs>' + [['capsule', 'Capsule'], ['drops', 'Gouttes']].map(function (m) {
+        return '<button data-navstyle="' + m[0] + '" aria-pressed="' + ((look.nav || 'capsule') === m[0]) + '">' + m[1] + '</button>';
+      }).join('') + '</div>' : '') +
       '<div class="settings-sec">Couleurs</div><div class="swatches">' + Themes.LIST.map(function (t) {
         var sw = t.a;
         return '<button class="swatch" data-theme-id="' + t.id + '" aria-pressed="' + (look.theme === t.id) + '"><i style="--sw:' + sw + '"></i>' + U.esc(t.name) + '</button>';
@@ -6309,6 +6391,14 @@ window.Views = Views;
           if ((b = e.target.closest('[data-mode]'))) {
             look.mode = b.getAttribute('data-mode');
             p.querySelectorAll('[data-mode]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+          } else if ((b = e.target.closest('[data-navstyle]'))) {
+            look.nav = b.getAttribute('data-navstyle');
+            p.querySelectorAll('[data-navstyle]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+            LS.set('look', look);
+            app.haptic();
+            renderNav();
+            Glass.attach('sheet', p.closest('.sheet') || p, { role: 'sheet', from: navShape(), morph: true, radius: 36 });
+            return;
           } else if ((b = e.target.closest('[data-theme-id]'))) {
             look.theme = b.getAttribute('data-theme-id');
             p.querySelectorAll('[data-theme-id]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
