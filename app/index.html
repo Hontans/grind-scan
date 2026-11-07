@@ -1302,7 +1302,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 22:06 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 22:26 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2729,9 +2729,17 @@ var Train = (function () {
     return { date: d, sets: list.filter(function (s) { return s.date === d; }).sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); }) };
   }
 
+  /** Réglages de la progression (voir suggest). */
+  var PROGRESSION = {
+    stepKg: 5,      // charge ajoutée quand le haut de la fourchette est atteint
+    setsAtTop: 2    // séries au haut de la fourchette (à la charge de travail) pour monter
+  };
+
   /**
-   * Double progression : toutes les séries en haut de fourchette → on monte la charge ;
-   * sinon on garde la charge et on vise une rep de plus.
+   * Double progression, d'après la dernière séance sur l'exercice (seules comptent les séries à la charge la plus lourde) :
+   * - au moins `setsAtTop` séries au haut de la fourchette → + `stepKg`, reps au bas de la fourchette ;
+   * - sinon on garde la charge et on ajoute une rep à la première série pas encore au haut de la fourchette
+   *   (`bump` = son numéro, `bumpReps` = reps visées).
    */
   function suggest(prev, repsText) {
     if (!prev || !prev.sets.length) return null;
@@ -2740,14 +2748,22 @@ var Train = (function () {
     if (!working.length) return null;
     var load = Math.max.apply(null, working.map(function (s) { return s.load; }));
     var top = working.filter(function (s) { return s.load === load; });
-    if (r && top.every(function (s) { return s.reps >= r.hi; })) {
-      var inc = load >= 40 ? 2.5 : load >= 10 ? 2 : 1;
-      return { load: Math.round((load + inc) * 10) / 10, reps: r.lo, text: 'Haut de fourchette atteint : monte à ' + String(Math.round((load + inc) * 10) / 10).replace('.', ',') + ' kg' };
+    var kg = function (v) { return String(v).replace('.', ',') + ' kg'; };
+    if (!r) return { load: load, reps: null, text: 'Garde ' + kg(load) + ' et vise +1 rep' };
+    var atTop = top.filter(function (s) { return s.reps >= r.hi; }).length;
+    if (atTop >= Math.min(PROGRESSION.setsAtTop, working.length)) {
+      var next = Math.round((load + PROGRESSION.stepKg) * 10) / 10;
+      return { load: next, reps: r.lo, text: 'Haut de fourchette atteint' + (atTop > 1 ? ' sur ' + atTop + ' séries' : '') + ' : monte à ' + kg(next) };
     }
-    if (r && top.some(function (s) { return s.reps < r.lo; })) {
-      return { load: load, reps: r.lo, text: 'Sous la fourchette : garde ' + String(load).replace('.', ',') + ' kg et vise ' + r.lo + ' reps' };
+    var no = function (s) { return s.setNo || prev.sets.indexOf(s) + 1; };
+    var b = top.filter(function (s) { return s.reps < r.hi; })[0];
+    if (b) {
+      return { load: load, reps: null, bump: no(b), bumpReps: b.reps + 1,
+        text: 'Garde ' + kg(load) + ' et vise ' + (b.reps + 1) + ' reps à la série ' + no(b) };
     }
-    return { load: load, reps: null, text: 'Garde ' + String(load).replace('.', ',') + ' kg et vise +1 rep' };
+    // Toutes les séries à cette charge sont au haut de la fourchette, mais trop peu sont à cette charge.
+    var light = working.filter(function (s) { return s.load < load; })[0];
+    return { load: load, reps: null, text: 'Garde ' + kg(load) + ' et fais aussi la série ' + no(light) + ' à ' + kg(load) };
   }
 
   /** Séries d'échauffement pour une charge de travail (≥ 20 kg). */
@@ -3542,7 +3558,7 @@ var Videos = (function () {
  * Écran « Séance » : la séance du jour est déjà affichée, prête à remplir (une autre se choisit en haut).
  * La séance démarre avec le bouton ou dès la première série validée. Historique et records : bouton en haut à droite.
  * - Les charges et reps de la dernière fois servent de valeurs par défaut (un tap sur ✓ suffit si rien ne change).
- * - Double progression : suggestion de charge quand le haut de la fourchette est atteint partout.
+ * - Double progression (Train.suggest) : + 5 kg dès 2 séries au haut de la fourchette, sinon + 1 rep à la première série pas au haut.
  * - Chaque série validée est enregistrée tout de suite (Store.put, envoi groupé) et lance le minuteur de repos.
  * - La séance en cours survit à un rechargement de la page (localStorage).
  */
@@ -3693,7 +3709,7 @@ Views.train = (function () {
       var saved = savedSet(w, p.exercise, i), dr = !saved && draft[p.exercise + '|' + i] || {};
       var lastSet = prev && prev.sets.filter(function (s) { return s.setNo === i; })[0];
       var phLoad = sug ? sug.load : (lastSet && lastSet.load);
-      var phReps = sug && sug.reps ? sug.reps : (lastSet && lastSet.reps);
+      var phReps = sug && sug.reps ? sug.reps : sug && sug.bump === i ? sug.bumpReps : (lastSet && lastSet.reps);
       rows += '<div class="set-row' + (saved ? ' done' : '') + '" data-row="' + idx + '-' + i + '">' +
         '<span class="set-n">' + i + '</span>' +
         '<span class="field-box"><input inputmode="numeric" data-reps placeholder="' + (phReps == null ? 'reps' : U.nf(phReps, 0)) + '" value="' + (saved && saved.reps != null ? saved.reps : U.esc(dr.reps || '')) + '"><span class="unit">reps</span></span>' +
