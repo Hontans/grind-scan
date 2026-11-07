@@ -1231,7 +1231,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 00:33 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 00:55 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1835,6 +1835,13 @@ window.Liquid = (function () {
   // ---------------------------------------------------------------- taille et cadrage
 
   var cw = 0, ch = 0, dpr = 1, dprCap = 2.5;
+  // Définition déjà jugée trop lourde pour ce téléphone (gardée une semaine) : on y démarre directement,
+  // au lieu de saccader au début de chaque ouverture le temps de la retrouver.
+  var DPR_KEY = 'grind:lqDpr';
+  try {
+    var savedDpr = JSON.parse(localStorage.getItem(DPR_KEY) || 'null');
+    if (savedDpr && savedDpr.cap >= 1.5 && savedDpr.cap < dprCap && Date.now() - savedDpr.at < 7 * 864e5) dprCap = savedDpr.cap;
+  } catch (e) { /* stockage indisponible */ }
   function resize() {
     var r = canvas.getBoundingClientRect();
     cw = r.width || window.innerWidth;
@@ -2074,7 +2081,10 @@ window.Liquid = (function () {
 
     // Trop lent sur ce téléphone : on baisse la définition plutôt que de saccader.
     if (rawDt > 30 && rawDt < 120) slow++; else if (slow > 0) slow -= .25;
-    if (slow > 24 && dpr > 1.5) { dprCap = Math.max(1.5, dpr - .5); slow = 0; resize(); }
+    if (slow > 12 && dpr > 1.5) {
+      dprCap = Math.max(1.5, dpr - .5); slow = 0; resize();
+      try { localStorage.setItem(DPR_KEY, JSON.stringify({ cap: dprCap, at: Date.now() })); } catch (e) { /* stockage indisponible */ }
+    }
 
     if (needMeasure || now < trackUntil) {
       needMeasure = false;
@@ -2929,9 +2939,18 @@ var Store = (function () {
     Object.keys(dels).forEach(function (t) { n += Object.keys(dels[t]).length; });
     return n;
   }
-  function persist() {
+  // La file (petite, c'est elle qui garantit qu'aucune saisie ne se perd) est écrite à chaque saisie.
+  // La copie des données (plus d'un Mo après un an) ne l'est qu'au repos : l'écrire à chaque toucher
+  // bloquait l'écran 50 à 100 ms sur un petit téléphone. Au relancement, la file est réappliquée par-dessus.
+  var saveTimer = null;
+  function saveData() {
+    clearTimeout(saveTimer); saveTimer = null;
+    if (data) LS.set('data', data);
+  }
+  function persist(now) {
     LS.set('queue', { put: queue, del: dels });
-    LS.set('data', data);
+    if (now) saveData();
+    else if (!saveTimer) saveTimer = setTimeout(saveData, 2000);
     status.pending = countPending();
     listeners.forEach(function (fn) { fn(status); });
   }
@@ -2946,7 +2965,7 @@ var Store = (function () {
     // Ce qui n'est pas encore parti au serveur reste prioritaire sur ce que le serveur a renvoyé.
     Object.keys(queue).forEach(function (t) { Object.keys(queue[t]).forEach(function (id) { applyLocal(t, queue[t][id]); }); });
     Object.keys(dels).forEach(function (t) { Object.keys(dels[t]).forEach(function (id) { removeLocal(t, id); }); });
-    persist();
+    persist(true);
     if (status.pending) schedule(500);
   }
 
@@ -2983,6 +3002,7 @@ var Store = (function () {
   /** Envoie toute la file en un appel. Sans effet si rien n'attend ou si un envoi est déjà en cours. */
   function flush() {
     clearTimeout(timer);
+    if (saveTimer) saveData(); // app en arrière-plan : la copie des données est écrite tout de suite
     if (inflight || !countPending()) return;
     if (typeof google === 'undefined' || !google.script) return;
     var ops = [];
@@ -3017,7 +3037,7 @@ var Store = (function () {
         });
         inflight = null; retryMs = 0;
         status.syncing = false; status.error = null; status.lastSync = new Date().toISOString();
-        persist();
+        persist(true); // file vidée : la copie des données doit contenir ce qui vient de partir
         if (countPending()) schedule(DEBOUNCE_MS);
       })
       .withFailureHandler(function (err) {
@@ -5801,7 +5821,7 @@ window.Views = Views;
     var old = document.getElementById('view');
     var ghost = !!(dir && old && old.firstChild && lastTab !== null && !reduceMotion);
     if (ghost) ghostOut(old, dir);
-    mountHead(view.header(state, app), !!dir);
+    var headHtml = view.header(state, app);
     // Un nouveau conteneur à chaque rendu : les écouteurs de l'écran précédent disparaissent avec lui.
     var fresh = document.createElement('main');
     fresh.id = 'view';
@@ -5810,9 +5830,15 @@ window.Views = Views;
     if (ghost || !old.parentNode) $scroll.appendChild(fresh); else old.parentNode.replaceChild(fresh, old);
     view.bind(fresh, state, app);
     lastTab = state.tab;
-    decorate(fresh);
+    // Toutes les écritures d'abord, puis les mesures : le téléphone ne recalcule la page qu'une fois
+    // (chaque lecture après une écriture force un recalcul complet, c'est ce qui faisait accrocher le changement d'écran).
+    fresh.querySelectorAll('.seg').forEach(function (s) { segSync(s); });
     if (dir) intro(fresh, dir, ghost);
-    renderNav();
+    var frosted = insertFrost(fresh);
+    var restart = navRestart(); // relance des animations d'onglet : classes retirées avant le recalcul, remises après
+    mountHead(headHtml, !!dir); // première mesure (verre de l'en-tête) : le seul recalcul
+    placeFrost(frosted);
+    renderNav(restart);
     renderDock();
   }
 
@@ -5829,10 +5855,12 @@ window.Views = Views;
     g.inert = true;
     g.style.top = -y + 'px';
     g.style.transformOrigin = '50% ' + Math.round(y + window.innerHeight * 0.45) + 'px';
+    // mesures avant toute écriture : rien à recalculer
+    var vh = window.innerHeight, off = [];
+    node.querySelectorAll('.card, .tile').forEach(function (c) { var r = c.getBoundingClientRect(); if (r.bottom < 0 || r.top > vh) off.push(c); });
+    off.forEach(function (c) { c.style.visibility = 'hidden'; });
     node.removeAttribute('id');
     node.querySelectorAll('[id]').forEach(function (el) { el.removeAttribute('id'); });
-    var vh = window.innerHeight;
-    node.querySelectorAll('.card, .tile').forEach(function (c) { var r = c.getBoundingClientRect(); if (r.bottom < 0 || r.top > vh) c.style.visibility = 'hidden'; });
     g.appendChild(node);
     document.body.appendChild(g);
     setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 320);
@@ -5889,6 +5917,10 @@ window.Views = Views;
   // c'est le téléphone qui le garde immobile pendant le défilement, sans aucun calcul.
   var frostBox = null;
   function addFrost(scope) {
+    placeFrost(insertFrost(scope));
+  }
+  /** Pose le verre dans les cartes qui ne l'ont pas encore (écritures seulement) ; rend ces cartes, à placer ensuite. */
+  function insertFrost(scope) {
     var added = [];
     scope.querySelectorAll('.card, .tile').forEach(function (card) {
       if (card.closest('.sheet')) return;
@@ -5902,7 +5934,7 @@ window.Views = Views;
       card.appendChild(wrap);
       added.push(card);
     });
-    placeFrost(added);
+    return added;
   }
   function placeFrost(cards) {
     var xs = cards.map(function (c) {
@@ -5979,7 +6011,17 @@ window.Views = Views;
     }, true);
   }
 
-  function renderNav() {
+  /** Onglet qui change : retire tout de suite les classes d'animation, pour qu'elles repartent de zéro quand renderNav les remet. */
+  function navRestart() {
+    var nav = $nav.querySelector('nav');
+    if (!nav || nav.dataset.i == null || Number(nav.dataset.i) === TAB_IDS.indexOf(state.tab) || reduceMotion) return false;
+    nav.querySelector('.ind').classList.remove('move');
+    var b = nav.querySelector('[data-tab="' + state.tab + '"]');
+    if (b) b.classList.remove('pop');
+    return true;
+  }
+
+  function renderNav(restarted) {
     if (!$nav.firstChild) {
       $nav.innerHTML = '<div class="tabbar"><nav aria-label="Navigation" data-glass="nav"><span class="ind" aria-hidden="true"></span>' + TABS.map(function (t) {
         return '<button data-tab="' + t.id + '" aria-label="' + t.label + '"><span>' + icon(t.id) + '</span></button>';
@@ -5993,11 +6035,13 @@ window.Views = Views;
     var live = !!LS.get('workout', null);
     nav.dataset.i = idx;
     nav.style.setProperty('--i', idx);
-    if (moved) { ind.classList.remove('move'); void ind.offsetWidth; ind.classList.add('move'); }
+    // Sans recalcul entre-temps (aucune mesure faite), il faut le forcer pour relancer l'animation.
+    var reflow = moved && !(restarted && (Glass.on || $scroll.querySelector('.fr-w')));
+    if (moved) { ind.classList.remove('move'); if (reflow) void ind.offsetWidth; ind.classList.add('move'); }
     nav.querySelectorAll('[data-tab]').forEach(function (b) {
       var on = b.getAttribute('data-tab') === state.tab;
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
-      if (on && moved) { b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop'); }
+      if (on && moved) { b.classList.remove('pop'); if (reflow) void b.offsetWidth; b.classList.add('pop'); }
       // point animé sur Séance quand une séance est en cours ailleurs
       b.firstChild.className = b.getAttribute('data-tab') === 'train' && live && state.tab !== 'train' ? 'live' : '';
     });
