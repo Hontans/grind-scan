@@ -1261,7 +1261,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 01:55 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-07 02:11 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -6003,10 +6003,12 @@ window.Views = Views;
 
   // ---------------------------------------------------------------- barre d'onglets
 
-  /** Glisser le doigt sur la capsule : la pastille le suit, l'onglet le plus proche s'ouvre au lâcher. */
+  /** Glisser le doigt sur la capsule : la pastille le suit, l'onglet le plus proche s'ouvre au lâcher.
+   *  Sur les gouttes : la pilule saute de goutte en goutte sous le pouce (navSel), l'onglet s'ouvre au lâcher. */
+  var navSel = null;
   function bindNavDrag(nav) {
     if (!Glass.on) return;
-    var drag = null, moved = false, x0 = 0, skipClick = false;
+    var drag = null, moved = false, x0 = 0, skipClick = false, dropPress = null;
     function nearest(x) {
       var best = null, dist = Infinity;
       nav.querySelectorAll('[data-tab]').forEach(function (b) {
@@ -6018,6 +6020,16 @@ window.Views = Views;
     function finish(e, cancelled) {
       if (drag === null || e.pointerId !== drag) return;
       drag = null;
+      if (dropPress) {
+        Glass.press(dropPress, false); dropPress = null;
+        var to = navSel; navSel = null;
+        skipClick = true; // le doigt capturé, le clic viserait la barre et non la goutte : on ouvre ici
+        setTimeout(function () { skipClick = false; }, 400);
+        if (!moved) { var t = nearest(e.clientX); to = t && t.getAttribute('data-tab'); }
+        if (!cancelled && to && (to !== state.tab || !moved)) app.go(to); // toucher l'onglet actif remonte en haut
+        else if (moved) renderNav();
+        return;
+      }
       Glass.lensPress(false);
       if (moved) Glass.lensDrag(null);
       skipClick = true;
@@ -6027,25 +6039,27 @@ window.Views = Views;
     }
     nav.addEventListener('pointerdown', function (e) {
       if (e.button) return;
-      if (splitNav()) { // gouttes : celle sous le doigt enfle, pas de glissé
-        var tb = e.target.closest('[data-tab]');
-        if (!tb) return;
-        var gid = tb.getAttribute('data-tab') === state.tab ? 'tab:sel' : 'tab:' + tb.getAttribute('data-tab');
-        Glass.press(gid, true);
-        var up = function () { Glass.press(gid, false); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', up);
-        return;
-      }
       drag = e.pointerId;
       moved = false;
       x0 = e.clientX;
       try { nav.setPointerCapture(e.pointerId); } catch (err) { /* pas de capture */ }
+      if (splitNav()) { // gouttes : celle sous le doigt enfle ; en glissant, la pilule la suit
+        var tb = e.target.closest('[data-tab]');
+        dropPress = tb && tb.getAttribute('data-tab') !== state.tab ? 'tab:' + tb.getAttribute('data-tab') : 'tab:sel';
+        Glass.press(dropPress, true);
+        return;
+      }
       Glass.lensPress(true);
     });
     nav.addEventListener('pointermove', function (e) {
       if (e.pointerId !== drag || (!moved && Math.abs(e.clientX - x0) < 8)) return;
       moved = true;
+      if (dropPress) {
+        var b = nearest(e.clientX), id = b && b.getAttribute('data-tab');
+        if (dropPress !== 'tab:sel') { Glass.press(dropPress, false); dropPress = 'tab:sel'; Glass.press('tab:sel', true); }
+        if (id && id !== (navSel || state.tab)) { navSel = id; renderNav(); }
+        return;
+      }
       Glass.lensDrag(e.clientX);
     });
     nav.addEventListener('pointerup', function (e) { finish(e, false); });
@@ -6075,7 +6089,8 @@ window.Views = Views;
       n.addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) app.go(b.getAttribute('data-tab')); });
     }
     var nav = $nav.querySelector('nav'), ind = nav.querySelector('.ind');
-    var idx = TAB_IDS.indexOf(state.tab), moved = nav.dataset.i != null && Number(nav.dataset.i) !== idx && !reduceMotion;
+    var sel = navSel || state.tab;
+    var idx = TAB_IDS.indexOf(sel), moved = nav.dataset.i != null && Number(nav.dataset.i) !== idx && !reduceMotion;
     var live = !!LS.get('workout', null);
     nav.dataset.i = idx;
     nav.style.setProperty('--i', idx);
@@ -6087,7 +6102,7 @@ window.Views = Views;
     var glide = moved && splitNav() && nav.classList.contains('split');
     var icons = glide ? Array.prototype.map.call(nav.querySelectorAll('[data-tab] > span'), function (s) { return [s, s.getBoundingClientRect().left]; }) : null;
     nav.querySelectorAll('[data-tab]').forEach(function (b) {
-      var on = b.getAttribute('data-tab') === state.tab;
+      var on = b.getAttribute('data-tab') === sel;
       if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
       if (on && moved) { b.classList.remove('pop'); if (reflow) void b.offsetWidth; b.classList.add('pop'); }
       // point animé sur Séance quand une séance est en cours ailleurs
@@ -6106,7 +6121,7 @@ window.Views = Views;
       var cur = null;
       nav.querySelectorAll('[data-tab]').forEach(function (b) {
         var id = b.getAttribute('data-tab');
-        if (id === state.tab) { cur = b; Glass.remove('tab:' + id); return; }
+        if (id === sel) { cur = b; Glass.remove('tab:' + id); return; }
         // née dans la pilule (à son ancienne place, encore sa cible), elle s'en détache en rejoignant sa place
         Glass.attach('tab:' + id, b, { role: 'nav', from: 'tab:sel', radius: 'pill', instant: first });
       });
