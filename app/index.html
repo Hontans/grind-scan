@@ -1162,6 +1162,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .chart .trend { fill: none; stroke: var(--accent-ink); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 2px 6px var(--accent-glow)); }
 .chart .bar { fill: var(--accent-ink); }
 .chart .bar-low { fill: var(--warn); }
+.chart .goal { stroke: var(--text-2); stroke-width: 1.4; stroke-dasharray: 3 2; }
 .chart .dot-accent { fill: var(--accent-ink); stroke: var(--solid); stroke-width: 1.5; }
 .rv:not(.in) .chart .trend { stroke-dasharray: 1600; stroke-dashoffset: 1600; }
 .rv.in .chart .trend { stroke-dasharray: 1600; animation: drawLine 1.6s var(--ease-out) calc(var(--d, 0ms) + 150ms) backwards; }
@@ -1312,7 +1313,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 01:12 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 01:15 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5607,6 +5608,44 @@ Views.trends = (function () {
     return box('<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart tip-chart" role="img" aria-label="Heures de sommeil sur ' + days + ' jours">' + axis + bars + '</svg>');
   }
 
+  /** Objectif de pas d'un jour : celui des objectifs du coach, sinon celui du planning. */
+  function stepGoal(date) {
+    var t = Calc.targetFor(Store.list('TARGETS'), date);
+    return (t && t.steps) || Calc.dayPlan(Store.list('SETTINGS'), U.dow(date)).steps || null;
+  }
+
+  /** Pas par jour (barres), trait pointillé = objectif du jour ; sous l'objectif la barre passe en couleur d'alerte. */
+  function stepsChart(daily, end, days) {
+    var m = {};
+    daily.forEach(function (d) { m[d.date] = d; });
+    var start = U.addDays(end, -(days - 1));
+    var bw = (W - PAD.l - PAD.r) / days;
+    var h = 120, top = 10, base = h - 20, bars = '', vals = [], goals = [];
+    for (var j = 0; j < days; j++) {
+      var dj = U.addDays(start, j), x = m[dj];
+      if (x && typeof x.steps === 'number') vals.push(x.steps);
+      goals.push(stepGoal(dj));
+    }
+    if (!vals.length) return '<p class="muted">Les barres apparaissent dès que tes pas sont notés dans la journée.</p>';
+    var hi = Math.ceil(Math.max.apply(null, vals.concat(goals.filter(Boolean), [10000])) * 1.05 / 5000) * 5000;
+    var y = function (v) { return base - v / hi * (base - top); };
+    for (var i = 0; i < days; i++) {
+      var date = U.addDays(start, i), d = m[date] || {}, g = goals[i], cx = PAD.l + i * bw;
+      if (typeof d.steps === 'number') {
+        var hh = Math.max(2, base - y(d.steps));
+        bars += '<rect x="' + (cx + 1.5) + '" y="' + (base - hh) + '" width="' + Math.max(2, bw - 3) + '" height="' + hh + '" rx="2" class="' + (g && d.steps < g ? 'bar-low' : 'bar') + '"' +
+          tipAttr(cx + bw / 2, base - hh, [U.dayLetter(date) + ' ' + U.shortDate(date), U.nf(d.steps, 0) + ' pas', g ? 'Objectif : ' + U.nf(g, 0) : '']) + '/>';
+      }
+      if (g) bars += '<line x1="' + cx + '" x2="' + (cx + bw) + '" y1="' + y(g) + '" y2="' + y(g) + '" class="goal"/>';
+      if (U.dow(date) === 1) bars += '<text x="' + (cx + bw / 2) + '" y="' + (h - 6) + '" class="axis" text-anchor="middle">' + U.shortDate(date) + '</text>';
+    }
+    var axis = [0, hi / 2, hi].map(function (v) {
+      return '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="grid"/>' +
+        '<text x="' + (PAD.l - 6) + '" y="' + (y(v) + 3) + '" class="axis" text-anchor="end">' + (v ? U.nf(v / 1000, v % 1000 ? 1 : 0) + ' k' : '0') + '</text>';
+    }).join('');
+    return box('<svg viewBox="0 0 ' + W + ' ' + h + '" class="chart tip-chart" role="img" aria-label="Pas sur ' + days + ' jours">' + axis + bars + '</svg>');
+  }
+
   function table(daily, end, days) {
     var m = {};
     daily.forEach(function (d) { m[d.date] = d; });
@@ -6048,8 +6087,24 @@ Views.trends = (function () {
       '<section class="card"><div class="card-head"><h2>Sommeil</h2><span class="muted small">28 derniers jours</span></div>' +
       '<p class="lead">Sommeil moyen 7 j : <b>' + (sleep7.length ? U.nf(Calc.mean(sleep7)) + ' h' : '–') + '</b></p>' +
       sleepChart(daily, end, 28) + '<p class="muted small">Repère : 7 h. En dessous, la barre change de couleur.</p></section>' +
+      stepsCard(daily, end) +
       progressCard(state) + volumeCard() + measuresCard() + Photos.card() +
       '<button class="btn ghost block all-data" data-all-data>' + App.icon('list') + 'Afficher toutes les données</button>';
+  }
+
+  function stepsCard(daily, end) {
+    var v = [], hit = 0, withGoal = 0;
+    for (var i = 0; i < 7; i++) {
+      var date = U.addDays(end, -i), d = daily.filter(function (x) { return x.date === date; })[0];
+      if (d && typeof d.steps === 'number') {
+        v.push(d.steps);
+        var g = stepGoal(date);
+        if (g) { withGoal++; if (d.steps >= g) hit++; }
+      }
+    }
+    return '<section class="card"><div class="card-head"><h2>Pas</h2><span class="muted small">28 derniers jours</span></div>' +
+      '<p class="lead">Moyenne 7 j : <b>' + (v.length ? U.nf(Calc.mean(v), 0) : '–') + '</b>' + (withGoal ? ', objectif atteint ' + hit + ' jour' + (hit > 1 ? 's' : '') + ' sur ' + withGoal : '') + '</p>' +
+      stepsChart(daily, end, 28) + '<p class="muted small">Pointillés : objectif du jour. En dessous, la barre change de couleur.</p></section>';
   }
 
   function header() {
