@@ -1314,7 +1314,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 15:27 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 15:38 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2654,6 +2654,37 @@ var Nutri = (function () {
     return '';
   }
 
+  /**
+   * Poids cuit pour 1 g cru (estimation moyenne, cuisson à l'eau ou à la poêle) : l'eau absorbée par les féculents,
+   * perdue par la viande et le poisson. null : inconnu, ou poids presque inchangé (légumes, œufs, pommes de terre).
+   */
+  var COOK_YIELDS = [
+    [/\b(riz|risotto)\b/, 2.5],
+    [/\b(pates|spaghetti|penne|fusilli|tagliatelles?|macaronis?|coquillettes|nouilles|lasagnes?)\b/, 2.4],
+    [/\b(semoule|couscous|boulgour|ebly|ble)\b/, 2.3],
+    [/\b(quinoa)\b/, 2.7],
+    [/\b(lentilles)\b/, 2.5],
+    [/\b(pois chiches|haricots (rouges|blancs|secs)|flageolets|feves)\b/, 2.2],
+    [/\b(poulet|dinde|boeuf|steak|veau|porc|agneau|canard|viande|hache|escalope|filet|cuisse|cote|jambon|saucisses?)\b/, 0.75],
+    [/\b(saumon|cabillaud|colin|merlu|poisson|truite|thon frais|crevettes|seiches?|calamars?|encornets?|poulpe|moules)\b/, 0.8]
+  ];
+
+  function cookYield(food) {
+    var n = norm(food && food.name);
+    for (var i = 0; i < COOK_YIELDS.length; i++) if (COOK_YIELDS[i][0].test(n)) return COOK_YIELDS[i][1];
+    return null;
+  }
+
+  /**
+   * Quantité dans l'état des valeurs de l'aliment, pour `qty` g pesés crus ou cuits (`weighed`) :
+   * riz aux valeurs cuites pesé cru → × 2,5 ; steak aux valeurs crues pesé cuit → ÷ 0,75. Sinon qty tel quel.
+   */
+  function refQty(food, qty, weighed) {
+    var st = stateOf(food), y = cookYield(food), q = Number(qty) || 0;
+    if (!st || !y || (weighed !== 'cru' && weighed !== 'cuit') || weighed === st) return q;
+    return st === 'cuit' ? q * y : q / y;
+  }
+
   /** Valeurs pour une quantité (g) d'un aliment défini pour 100 g (fiber : null si inconnues). */
   function forQty(food, qty) {
     var k = (Number(qty) || 0) / 100, fb = fiberOf(food);
@@ -2669,7 +2700,7 @@ var Nutri = (function () {
     if (v !== null) return v;
     var food = e && e.foodId && foodsById && foodsById[e.foodId];
     var fb = food && e.qty ? fiberOf(food) : null;
-    return fb === null ? null : r1(fb * e.qty / 100);
+    return fb === null ? null : r1(fb * refQty(food, e.qty, e.state) / 100);
   }
 
   /**
@@ -2728,7 +2759,7 @@ var Nutri = (function () {
       .forEach(function (e) {
         if (!e.foodId || seen[e.foodId] || !byId[e.foodId]) return;
         seen[e.foodId] = true;
-        out.push({ food: byId[e.foodId], qty: e.qty });
+        out.push({ food: byId[e.foodId], qty: e.qty, state: e.state || '' });
       });
     return out.slice(0, limit || 15);
   }
@@ -2781,7 +2812,7 @@ var Nutri = (function () {
     return { name: name, kcal: r0(t.kcal * k), p: r1(t.p * k), c: r1(t.c * k), f: r1(t.f * k), fiber: fiberKnown ? r1(t.fiber * k) : null, category: 'Recette', source: 'recette' };
   }
 
-  return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, fiberOf: fiberOf, stateOf: stateOf, entryFiber: entryFiber, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
+  return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, fiberOf: fiberOf, stateOf: stateOf, cookYield: cookYield, refQty: refQty, entryFiber: entryFiber, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
     search: search, recents: recents, mealTemplates: mealTemplates, recipeKey: recipeKey, recipeRows: recipeRows, recipe: recipe, norm: norm };
 })();
 </script>
@@ -4078,8 +4109,8 @@ Views.food = (function () {
   function entries(date) { return Nutri.dayEntries(Store.list('FOOD_LOG'), date); }
   function settings() { return Store.list('SETTINGS'); }
   function displayName(f) { return f.name + (f.brand ? ' · ' + f.brand : ''); }
-  /** « 300 g cuit » : poids, précisé cru ou cuit quand les valeurs de l'aliment le sont (Nutri.stateOf). */
-  function grams(qty, f) { var st = Nutri.stateOf(f); return U.nf(qty, 0) + ' g' + (st ? ' ' + st : ''); }
+  /** « 300 g cuit » : poids pesé cru ou cuit (weighed), sinon dans l'état des valeurs de l'aliment (Nutri.stateOf). */
+  function grams(qty, f, weighed) { var st = weighed || Nutri.stateOf(f); return U.nf(qty, 0) + ' g' + (st ? ' ' + st : ''); }
 
   function targetsFor(date) {
     var plan = Calc.dayPlan(settings(), U.dow(date));
@@ -4149,7 +4180,7 @@ Views.food = (function () {
         (items.length ? badges({ p: sum.p, c: sum.c, f: sum.f, fiber: sum.fiberMissing < items.length ? sum.fiber : null }, 'meal-macros') : '') +
         (items.length ? '<ul class="entries">' + items.map(function (e) {
           return '<li><button class="entry" data-entry="' + U.esc(e.id) + '"><span class="entry-name">' + U.esc(e.name) + '</span>' +
-            '<span class="entry-meta"><span class="muted small">' + (e.qty ? grams(e.qty, byId[e.foodId]) + ' · ' : '') + U.nf(e.kcal, 0) + ' kcal</span>' +
+            '<span class="entry-meta"><span class="muted small">' + (e.qty ? grams(e.qty, byId[e.foodId], e.state) + ' · ' : '') + U.nf(e.kcal, 0) + ' kcal</span>' +
             badges({ p: e.p, c: e.c, f: e.f, fiber: Nutri.entryFiber(e, byId) }, '', true) + '</span></button></li>';
         }).join('') + '</ul>' : '') +
         '<div class="meal-actions"><button class="btn soft" data-add="' + U.esc(m) + '">+ Ajouter</button>' + copy + '</div>' +
@@ -4182,10 +4213,13 @@ Views.food = (function () {
 
   // ---------------------------------------------------------------- écritures
 
-  function logFood(food, qty, meal, existing) {
-    var v = Nutri.forQty(food, qty);
+  /** Entrée du journal ; weighed : qty pesée « cru » ou « cuit » (convertie si les valeurs de l'aliment sont dans l'autre état). */
+  function logFood(food, qty, meal, existing, weighed) {
+    var st = Nutri.stateOf(food);
+    var w = st && (weighed === 'cru' || weighed === 'cuit') ? weighed : st;
+    var v = Nutri.forQty(food, Nutri.refQty(food, qty, w));
     var rec = Object.assign({}, existing || { id: U.uid(), date: state.date }, {
-      meal: meal, foodId: food.id, name: displayName(food), qty: qty, kcal: v.kcal, p: v.p, c: v.c, f: v.f, fiber: v.fiber
+      meal: meal, foodId: food.id, name: displayName(food), qty: qty, state: w, kcal: v.kcal, p: v.p, c: v.c, f: v.f, fiber: v.fiber
     });
     Store.put('FOOD_LOG', rec);
   }
@@ -4207,10 +4241,10 @@ Views.food = (function () {
 
   // ---------------------------------------------------------------- feuille « Ajouter »
 
-  function foodRow(f, qty) {
-    return '<li><button class="food-row" data-food="' + U.esc(f.id) + '"' + (qty ? ' data-qty="' + qty + '"' : '') + '>' +
+  function foodRow(f, qty, weighed) {
+    return '<li><button class="food-row" data-food="' + U.esc(f.id) + '"' + (qty ? ' data-qty="' + qty + '"' + (weighed ? ' data-st="' + weighed + '"' : '') : '') + '>' +
       '<span class="entry-name">' + (f.fav ? '★ ' : '') + U.esc(displayName(f)) + '</span>' +
-      '<span class="muted small">' + U.nf(f.kcal, 0) + ' kcal · P ' + U.nf(f.p) + ' · G ' + U.nf(f.c) + ' · L ' + U.nf(f.f) + ' /' + grams(100, f) + (qty ? ' · dernière fois ' + grams(qty, f) : '') + '</span>' +
+      '<span class="muted small">' + U.nf(f.kcal, 0) + ' kcal · P ' + U.nf(f.p) + ' · G ' + U.nf(f.c) + ' · L ' + U.nf(f.f) + ' /' + grams(100, f) + (qty ? ' · dernière fois ' + grams(qty, f, weighed) : '') + '</span>' +
       '</button></li>';
   }
 
@@ -4235,7 +4269,7 @@ Views.food = (function () {
             var favs = foods().filter(function (f) { return f.fav; });
             var rec = Nutri.recents(Store.list('FOOD_LOG'), foods(), 15);
             if (favs.length) html += '<h3 class="list-title">Favoris</h3><ul class="list">' + favs.map(function (f) { return foodRow(f); }).join('') + '</ul>';
-            html += '<h3 class="list-title">Récents</h3>' + (rec.length ? '<ul class="list">' + rec.map(function (r) { return foodRow(r.food, r.qty); }).join('') + '</ul>'
+            html += '<h3 class="list-title">Récents</h3>' + (rec.length ? '<ul class="list">' + rec.map(function (r) { return foodRow(r.food, r.qty, r.state); }).join('') + '</ul>'
               : '<p class="muted small">Tes aliments récents apparaîtront ici.</p>');
           } else {
             var local = Nutri.search(foods(), q, 25);
@@ -4253,7 +4287,7 @@ Views.food = (function () {
             var id = b.getAttribute('data-food');
             var f = foodById(id) || online.filter(function (x) { return x.id === id; })[0];
             if (!foodById(id)) Store.put('FOODS', f); // produit Open Food Facts : gardé dans ta base pour la prochaine fois
-            return openQty(f, { meal: meal, qty: U.parseNum(b.getAttribute('data-qty')) });
+            return openQty(f, { meal: meal, qty: U.parseNum(b.getAttribute('data-qty')), weighed: b.getAttribute('data-st') || '' });
           }
           if (e.target.closest('[data-online]')) {
             var q = input.value.trim();
@@ -4331,14 +4365,20 @@ Views.food = (function () {
     var meals = Nutri.meals(settings());
     var meal = opts.meal || meals[0];
     var qty = opts.qty || (food.unitG ? Number(food.unitG) : 100);
-    var st = Nutri.stateOf(food);
+    // Valeurs de l'aliment pour le produit cru ou cuit ; pesé dans l'autre état : poids converti (Nutri.refQty, estimation).
+    var st = Nutri.stateOf(food), y = st ? Nutri.cookYield(food) : null;
+    var weighed = (opts.entry ? opts.entry.state : opts.weighed) || st;
+    if (!y || (weighed !== 'cru' && weighed !== 'cuit')) weighed = st;
     app.openSheet({
       title: displayName(food),
-      html: '<div class="qty-row"><label class="field grow"><span class="field-label">' + (st ? 'Poids ' + st : 'Quantité') + '</span><span class="field-box">' +
+      html: (y ? '<div class="seg food-state" role="group" aria-label="Pesé cru ou cuit">' + ['cru', 'cuit'].map(function (w) {
+        return '<button type="button" data-w="' + w + '" aria-pressed="' + (w === weighed) + '">Pesé ' + w + '</button>';
+      }).join('') + '</div>' : '') +
+        '<div class="qty-row"><label class="field grow"><span class="field-label" data-qlabel>' + (st ? 'Poids ' + weighed : 'Quantité') + '</span><span class="field-box">' +
         '<input class="qty-input" data-qty inputmode="decimal" value="' + U.nf(qty, 1).replace(/\s/g, '') + '" autofocus><span class="unit">g</span></span></label></div>' +
         '<div class="chips">' + [50, 100, 150, 200].map(function (g) { return '<button class="pill" data-g="' + g + '">' + g + ' g</button>'; }).join('') +
-        (food.unitG ? '<button class="pill" data-g="' + food.unitG + '">1 ' + U.esc(food.unit || 'portion') + ' (' + food.unitG + ' g)</button>' : '') + '</div>' +
-        '<div class="preview" data-preview></div>' +
+        (food.unitG ? '<button class="pill" data-g="' + food.unitG + '" data-portion>1 ' + U.esc(food.unit || 'portion') + ' (' + grams(food.unitG, food) + ')</button>' : '') + '</div>' +
+        '<div class="preview" data-preview></div>' + (y ? '<p class="muted small" data-est></p>' : '') +
         '<div class="field-label">Repas</div><div class="chips" data-meals>' + meals.map(function (m) {
           return '<button class="pill' + (m === meal ? ' on' : '') + '" data-meal="' + U.esc(m) + '">' + U.esc(m) + '</button>';
         }).join('') + '</div>' +
@@ -4349,7 +4389,11 @@ Views.food = (function () {
         var input = p.querySelector('[data-qty]');
         var preview = function () {
           var q = U.parseNum(input.value) || 0;
-          var v = Nutri.forQty(food, q);
+          var ref = Nutri.refQty(food, q, weighed);
+          var v = Nutri.forQty(food, ref);
+          var est = p.querySelector('[data-est]');
+          if (est) est.textContent = weighed === st ? 'Les valeurs de l\'aliment sont pour le produit ' + st + '.'
+            : 'Estimation : ' + grams(q, food, weighed) + ' ≈ ' + grams(ref, food, st) + ' (poids × ' + U.nf(y, 2) + ' à la cuisson).';
           p.querySelector('[data-preview]').innerHTML = '<b>' + U.nf(v.kcal, 0) + ' kcal</b><span>P ' + U.nf(v.p) + ' g</span><span>G ' + U.nf(v.c) + ' g</span><span>L ' + U.nf(v.f) + ' g</span>' + (v.fiber == null ? '' : '<span>Fibres ' + U.nf(v.fiber) + ' g</span>');
         };
         input.addEventListener('input', preview);
@@ -4357,6 +4401,13 @@ Views.food = (function () {
         preview();
         p.addEventListener('click', function (e) {
           var b;
+          if ((b = e.target.closest('[data-w]')) || (y && e.target.closest('[data-portion]'))) {
+            weighed = b ? b.getAttribute('data-w') : st; // une portion se compte dans l'état des valeurs de l'aliment
+            p.querySelectorAll('[data-w]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-w') === weighed)); });
+            if (!b) p.querySelector('.food-state').style.setProperty('--i', weighed === 'cru' ? 0 : 1); // pastille (le clic n'est pas dans le contrôle)
+            p.querySelector('[data-qlabel]').textContent = 'Poids ' + weighed;
+            if (b) { preview(); return; }
+          }
           if ((b = e.target.closest('[data-g]'))) { input.value = b.getAttribute('data-g'); preview(); return; }
           if ((b = e.target.closest('[data-meal]'))) {
             meal = b.getAttribute('data-meal');
@@ -4366,7 +4417,7 @@ Views.food = (function () {
           if (e.target.closest('[data-ok]')) {
             var q = U.parseNum(input.value);
             if (!q || q <= 0) { app.toast('Quantité invalide'); return; }
-            logFood(food, q, meal, opts.entry);
+            logFood(food, q, meal, opts.entry, weighed);
             return after(opts.entry ? 'Modifié' : 'Ajouté à ' + meal);
           }
           if (e.target.closest('[data-del]')) { Store.remove('FOOD_LOG', opts.entry.id); return after('Supprimé'); }
