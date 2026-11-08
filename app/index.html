@@ -1314,7 +1314,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 15:38 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 15:40 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2651,8 +2651,13 @@ var Nutri = (function () {
     var n = norm(food.name);
     if (/(^|[^a-z])cuit(e|s|es)?([^a-z]|$)/.test(n)) return 'cuit';
     if (/(^|[^a-z])crue?s?([^a-z]|$)/.test(n)) return 'cru';
+    // Féculent sans repère (paquet scanné) : deviné d'après ses calories, sec ≈ 350 kcal / 100 g, cuit ≈ 130.
+    var kcal = num(food.kcal);
+    if (cookYield(food) > 1 && kcal > 0 && !NO_GUESS_RE.test(n)) return kcal >= 250 ? 'cru' : 'cuit';
     return '';
   }
+  // Produits à base de riz, de blé… qui ne se pèsent pas crus ou cuits (poudres, desserts, biscuits).
+  var NO_GUESS_RE = /\b(poudre|farine|creme|lait|galettes?|gateaux?|biscuits?|chips|souffles?|crackers?|porridge|cereales?|barres?|pain|sauce|soupe|salade|plat|cuisine)\b/;
 
   /**
    * Poids cuit pour 1 g cru (estimation moyenne, cuisson à l'eau ou à la poêle) : l'eau absorbée par les féculents,
