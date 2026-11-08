@@ -1304,7 +1304,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 00:52 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 00:59 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5781,16 +5781,10 @@ Views.trends = (function () {
     return n || null;
   }
 
+  /** Semaine du bilan : du lundi au dimanche, comme le planning des séances. */
   function weekRange(offset) {
-    var start = Store.list('SETTINGS').startDate;
     var today = U.today();
-    var from;
-    if (start && start <= today) {
-      var n = Math.floor(U.daysBetween(start, today) / 7);
-      from = U.addDays(start, 7 * (n - offset));
-    } else {
-      from = U.addDays(today, 1 - U.dow(today) - 7 * offset);
-    }
+    var from = U.addDays(today, 1 - U.dow(today) - 7 * offset);
     return { from: from, to: U.addDays(from, 6) };
   }
 
@@ -5842,9 +5836,9 @@ Views.trends = (function () {
       cell('Poids moyen', w.weight, prev.weight, 'kg', 2) +
       '<div class="stat"><span class="tile-label">Séances</span><b>' + w.sessionsDone + (w.sessionsPlanned ? ' / ' + w.sessionsPlanned : '') + '</b><span class="muted small">&nbsp;</span></div>' +
       '<div class="stat"><span class="tile-label">Calories moy.</span><b>' + (w.kcal === null ? '–' : U.nf(w.kcal, 0) + ' kcal') + '</b><span class="muted small">' +
-        (w.kcalTarget ? 'objectif ' + U.nf(w.kcalTarget, 0) + ' kcal' : '&nbsp;') + '</span></div>' +
-      '<div class="stat"><span class="tile-label">Calories dans la cible</span><b>' + (w.onTarget === null ? '–' : w.onTarget + ' / ' + w.days + ' j') + '</b><span class="muted small">' +
-        (w.loggedDays ? 'repas saisis ' + w.loggedDays + ' j sur ' + w.days : 'aucun repas saisi') + '</span></div>' +
+        (w.loggedDays ? 'sur ' + w.loggedDays + ' jour' + (w.loggedDays > 1 ? 's' : '') + ' saisi' + (w.loggedDays > 1 ? 's' : '') : 'aucun repas saisi') + '</span></div>' +
+      '<div class="stat"><span class="tile-label">Objectif calories</span><b>' + (w.onTarget === null ? '–' : w.onTarget + ' / ' + w.days + ' jours') + '</b><span class="muted small">' +
+        (w.kcalTarget ? 'atteint à ±10 % de ' + U.nf(w.kcalTarget, 0) : '&nbsp;') + '</span></div>' +
       cell('Pas moyens', w.steps, prev.steps, '', 0) +
       cell('Sommeil moy.', w.sleep, prev.sleep, 'h', 1) +
       '</div></section>';
