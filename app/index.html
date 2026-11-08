@@ -1249,6 +1249,27 @@ table.data tbody tr { cursor: pointer; }
 .streak-day.pending i { border-style: dashed; border-color: var(--accent); }
 .streak-day.future i { opacity: .4; }
 .streak-day small { font-size: 11px; color: var(--text-2); }
+.week-nav { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px; }
+.week-nav-txt { flex: 1; display: grid; justify-items: center; gap: 1px; text-align: center; }
+.week-nav-txt b { font: 600 15px/1.2 var(--font); }
+.review-seg { margin: 10px 0; }
+.wcharts { display: grid; gap: 8px; }
+.wchart { padding: 12px 13px 8px; border-radius: 20px; background: var(--field); }
+.wchart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.wchart-head b { font: 600 14px/1.2 var(--font); }
+.wchart-empty { margin: 6px 0 8px; }
+.chart .bar-off { fill: var(--text-3); opacity: .45; }
+.chart .goal { stroke: var(--text-2); stroke-width: 1.6; stroke-dasharray: 3 3; }
+.wsess { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding-bottom: 6px; }
+.wsess-day { display: grid; justify-items: center; gap: 3px; min-width: 0; }
+.wsess-day i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line); }
+.wsess-day i .icon { width: 15px; height: 15px; stroke-width: 2.4; }
+.wsess-day.ok i { border-color: transparent; color: var(--accent-ink); background: var(--accent-grad); }
+.wsess-day.todo i { border-color: var(--accent); border-style: dashed; }
+.wsess-day.miss i { border-color: var(--warn); }
+.wsess-day.rest i { opacity: .35; }
+.wsess-day small { font-size: 11px; color: var(--text-2); }
+.wsess-day em { font-style: normal; font-size: 10px; line-height: 1.15; color: var(--text-3); text-align: center; overflow-wrap: anywhere; }
 .stats.three { grid-template-columns: repeat(3, 1fr); margin-bottom: 12px; }
 .stats.three .stat { padding: 10px 11px; }
 .stats.three .stat b { font-size: 16px; }
@@ -1304,7 +1325,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 00:59 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 01:06 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -5794,7 +5815,7 @@ Views.trends = (function () {
     return Calc.dayPlan(Store.list('SETTINGS'), U.dow(d)).on ? t.kcalOn : (t.kcalOff || t.kcalOn);
   }
 
-  /** Série de jours dans la cible calories : en cours, record, et les 7 jours de la semaine affichée. */
+  /** Série de jours dans la cible calories : en cours et record (toujours à aujourd'hui), pastilles de la semaine affichée. */
   function streakBlock(r) {
     var today = U.today();
     var ok = Review.onTargetDay(Review.intakeByDay(Store.list('FOOD_LOG')), kcalTarget);
@@ -5812,7 +5833,7 @@ Views.trends = (function () {
       '<div class="streak-head"><span class="streak-flame">' + App.icon('flame') + '</span>' +
       '<div class="streak-txt"><b>' + title + '</b><span class="muted small">' + hint + '</span></div>' +
       '<div class="streak-best"><b>' + st.best + ' j</b><span class="muted small">record</span></div></div>' +
-      '<div class="streak-week" aria-label="' + n + ' jour' + (n > 1 ? 's' : '') + ' réussi' + (n > 1 ? 's' : '') + ' cette semaine">' + dots + '</div></div>';
+      '<div class="streak-week" aria-label="' + n + ' jour' + (n > 1 ? 's' : '') + ' réussi' + (n > 1 ? 's' : '') + ' cette semaine-là">' + dots + '</div></div>';
   }
 
   function weekSummary(offset) {
@@ -5823,15 +5844,136 @@ Views.trends = (function () {
     return w;
   }
 
-  function reviewCard() {
-    var w = weekSummary(0), prev = weekSummary(1);
+  /** Nombre de semaines qu'on peut remonter : jusqu'à la plus ancienne donnée (jour, repas ou séance). */
+  function maxWeekOffset() {
+    var oldest = U.today();
+    ['DAILY', 'FOOD_LOG', 'SESSIONS'].forEach(function (t) {
+      Store.list(t).forEach(function (x) { if (x.date && x.date < oldest) oldest = x.date; });
+    });
+    return Math.max(0, Math.ceil(U.daysBetween(oldest, weekRange(0).from) / 7));
+  }
+
+  // ---------------------------------------------------------------- bilan en graphiques (7 jours de la semaine affichée)
+
+  var WH = 112, WB = 20, WT = 12;
+  function weekX(i) { return PAD.l + (i + 0.5) * (W - PAD.l - PAD.r) / 7; }
+  function weekAxis(days) {
+    return days.map(function (d, i) { return '<text x="' + weekX(i) + '" y="' + (WH - 5) + '" class="axis" text-anchor="middle">' + U.dayLetter(d) + ' ' + U.shortDate(d).split(' ')[0] + '</text>'; }).join('');
+  }
+  function weekGrid(vals, y, fmt) {
+    return vals.map(function (v) {
+      return '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(v) + '" y2="' + y(v) + '" class="grid"/>' +
+        '<text x="' + (PAD.l - 6) + '" y="' + (y(v) + 3) + '" class="axis" text-anchor="end">' + fmt(v) + '</text>';
+    }).join('');
+  }
+  function weekSvg(label, inner) {
+    return box('<svg viewBox="0 0 ' + W + ' ' + WH + '" class="chart tip-chart" role="img" aria-label="' + label + '">' + inner + '</svg>');
+  }
+  function chartBlock(title, sub, svg) {
+    return '<div class="wchart"><div class="wchart-head"><b>' + title + '</b><span class="muted small">' + sub + '</span></div>' + svg + '</div>';
+  }
+
+  /** Barres par jour, avec un objectif par jour (trait) ; `good(v, t)` choisit la couleur de la barre. */
+  function weekBars(days, vals, targets, o) {
+    var all = vals.concat(targets).filter(function (v) { return typeof v === 'number'; });
+    if (!vals.some(function (v) { return typeof v === 'number'; })) return '<p class="muted small wchart-empty">' + o.empty + '</p>';
+    var hi = o.hi || 0;
+    all.forEach(function (v) { if (v > hi) hi = v; });
+    hi = Math.ceil(hi * 1.08 / o.step) * o.step;
+    var y = function (v) { return WT + (hi - v) * (WH - WT - WB) / hi; };
+    var bw = (W - PAD.l - PAD.r) / 7 * 0.56, out = weekGrid(o.ticks ? o.ticks(hi) : [0, hi / 2, hi], y, o.axis);
+    days.forEach(function (d, i) {
+      var v = vals[i], t = targets[i], x = weekX(i);
+      if (typeof v === 'number') {
+        var top = y(v), h = Math.max(2, y(0) - top);
+        out += '<rect x="' + (x - bw / 2) + '" y="' + (y(0) - h) + '" width="' + bw + '" height="' + h + '" rx="3" class="' + (o.good(v, t) ? 'bar' : 'bar-off') + '"' +
+          tipAttr(x, y(0) - h, [U.dayLetter(d) + ' ' + U.shortDate(d), o.tip(v), typeof t === 'number' ? 'Objectif : ' + o.tip(t) : '']) + '/>';
+      }
+      if (typeof t === 'number') out += '<line x1="' + (x - bw / 2 - 4) + '" x2="' + (x + bw / 2 + 4) + '" y1="' + y(t) + '" y2="' + y(t) + '" class="goal"/>';
+    });
+    return weekSvg(o.label, out + weekAxis(days));
+  }
+
+  function weekWeight(days, vals) {
+    var pts = [];
+    vals.forEach(function (v, i) { if (typeof v === 'number') pts.push({ i: i, v: v }); });
+    if (!pts.length) return '<p class="muted small wchart-empty">Aucune pesée cette semaine-là.</p>';
+    var nums = pts.map(function (p) { return p.v; });
+    var mean = Calc.mean(nums);
+    var lo = Math.floor((Math.min.apply(null, nums) - 0.3) * 2) / 2, hi = Math.ceil((Math.max.apply(null, nums) + 0.3) * 2) / 2;
+    var y = function (v) { return WT + (hi - v) * (WH - WT - WB) / (hi - lo); };
+    var out = weekGrid([lo, (lo + hi) / 2, hi], y, function (v) { return U.nf(v, 1); });
+    out += '<line x1="' + PAD.l + '" x2="' + (W - PAD.r) + '" y1="' + y(mean) + '" y2="' + y(mean) + '" class="goal"/>';
+    if (pts.length > 1) out += '<polyline class="trend" points="' + pts.map(function (p) { return weekX(p.i) + ',' + y(p.v); }).join(' ') + '"/>';
+    out += pts.map(function (p) {
+      return '<circle cx="' + weekX(p.i) + '" cy="' + y(p.v) + '" r="3.4" class="dot-accent"' +
+        tipAttr(weekX(p.i), y(p.v), [U.dayLetter(days[p.i]) + ' ' + U.shortDate(days[p.i]), 'Pesée : ' + U.nf(p.v, 2) + ' kg', 'Moyenne de la semaine : ' + U.nf(mean, 2) + ' kg']) + '/>';
+    }).join('');
+    return weekSvg('Poids de la semaine', out + weekAxis(days));
+  }
+
+  /** Séances : une pastille par jour, prévue (contour) ou faite (pleine). */
+  function weekSessions(days) {
+    var settings = Store.list('SETTINGS'), done = {};
+    Store.list('SESSIONS').forEach(function (x) { if (x.date >= days[0] && x.date <= days[6]) (done[x.date] = done[x.date] || []).push(x.name || 'Séance'); });
+    return '<div class="wsess">' + days.map(function (d) {
+      var plan = Calc.dayPlan(settings, U.dow(d)).session, did = done[d];
+      var cls = did ? 'ok' : plan ? (d < U.today() ? 'miss' : 'todo') : 'rest';
+      return '<span class="wsess-day ' + cls + '"><i>' + (did ? App.icon('check') : '') + '</i><small>' + U.dayLetter(d) + '</small>' +
+        '<em>' + U.esc(did ? did.join(', ') : plan || 'Repos') + '</em></span>';
+    }).join('') + '</div>';
+  }
+
+  function reviewCharts(r) {
+    var days = [];
+    for (var d = r.from; d <= r.to; d = U.addDays(d, 1)) days.push(d);
+    var daily = {};
+    Store.list('DAILY').forEach(function (x) { if (x.date >= r.from && x.date <= r.to) daily[x.date] = x; });
+    var intake = Review.intakeByDay(Store.list('FOOD_LOG').filter(function (e) { return e.date >= r.from && e.date <= r.to; }));
+    var field = function (k) { return days.map(function (d) { return daily[d] && typeof daily[d][k] === 'number' ? daily[d][k] : null; }); };
+    var kcal = days.map(function (d) { return intake[d] && intake[d].kcal > 500 ? Math.round(intake[d].kcal) : null; });
+    var settings = Store.list('SETTINGS'), targets = Store.list('TARGETS');
+    var stepGoals = days.map(function (d) { var t = Calc.targetFor(targets, d); return (t && t.steps) || Calc.dayPlan(settings, U.dow(d)).steps || null; });
+    var nf0 = function (v) { return U.nf(v, 0); };
+    var k = function (v) { return v >= 1000 ? U.nf(v / 1000, v % 1000 ? 1 : 0) + ' k' : U.nf(v, 0); };
+    return '<div class="wcharts">' +
+      chartBlock('Séances', 'faites et prévues', weekSessions(days)) +
+      chartBlock('Poids', 'pesées, trait = moyenne', weekWeight(days, field('weight'))) +
+      chartBlock('Calories', 'trait = objectif, en couleur si à ±10 %', weekBars(days, kcal, days.map(kcalTarget), {
+        step: 500, axis: k, label: 'Calories de la semaine', empty: 'Aucun repas saisi cette semaine-là.',
+        tip: function (v) { return nf0(v) + ' kcal'; },
+        good: function (v, t) { return typeof t === 'number' && Math.abs(v - t) / t <= 0.1; } })) +
+      chartBlock('Pas', 'trait = objectif', weekBars(days, field('steps'), stepGoals, {
+        step: 2000, axis: k, label: 'Pas de la semaine', empty: 'Aucun pas noté cette semaine-là.',
+        tip: function (v) { return nf0(v) + ' pas'; },
+        good: function (v, t) { return typeof t !== 'number' || v >= t; } })) +
+      chartBlock('Sommeil', 'trait = 7 h', weekBars(days, field('sleepH'), days.map(function () { return 7; }), {
+        hi: 9, step: 1, ticks: function (hi) { return [0, 7, hi]; }, axis: function (v) { return U.nf(v, 0) + ' h'; }, label: 'Sommeil de la semaine', empty: 'Aucune nuit notée cette semaine-là.',
+        tip: function (v) { return U.nf(v, 1) + ' h'; },
+        good: function (v) { return v >= 7; } })) +
+      '</div>';
+  }
+
+  function reviewCard(state) {
+    var max = maxWeekOffset();
+    var off = Math.min(Math.max(0, state.reviewWeek || 0), max);
+    state.reviewWeek = off;
+    var view = state.reviewView === 'charts' ? 'charts' : 'tiles';
+    var r = weekRange(off), w = weekSummary(off), prev = weekSummary(off + 1);
     var cell = function (label, v, pv, unit, dec) {
       var diff = v !== null && pv !== null && pv !== undefined ? v - pv : null;
       return '<div class="stat"><span class="tile-label">' + label + '</span><b>' + (v === null ? '–' : U.nf(v, dec) + (unit ? ' ' + unit : '')) + '</b>' +
         (diff !== null && Math.abs(diff) > 0 ? '<span class="muted small">' + U.signed(diff, dec) + ' vs sem. préc.</span>' : '<span class="muted small">&nbsp;</span>') + '</div>';
     };
-    return '<section class="card"><div class="card-head"><h2>Bilan de la semaine</h2><span class="muted small">' + w.label + '</span></div>' +
-      streakBlock(weekRange(0)) +
+    var title = off === 0 ? 'Cette semaine' : off === 1 ? 'Semaine dernière' : 'Il y a ' + off + ' semaines';
+    var nav = '<div class="week-nav">' +
+      '<button class="icon-btn ghost sm" data-week="1"' + (off >= max ? ' disabled' : '') + ' aria-label="Semaine précédente">' + App.icon('left') + '</button>' +
+      '<div class="week-nav-txt"><b>' + title + '</b><span class="muted small">' + w.label + '</span></div>' +
+      '<button class="icon-btn ghost sm" data-week="-1"' + (off === 0 ? ' disabled' : '') + ' aria-label="Semaine suivante">' + App.icon('right') + '</button></div>';
+    var seg = '<div class="seg review-seg">' + [['tiles', 'Chiffres'], ['charts', 'Graphiques']].map(function (t) {
+      return '<button data-review-view="' + t[0] + '" aria-pressed="' + (t[0] === view) + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
+    var body = view === 'charts' ? reviewCharts(r) :
       '<div class="stats">' +
       cell('Poids moyen', w.weight, prev.weight, 'kg', 2) +
       '<div class="stat"><span class="tile-label">Séances</span><b>' + w.sessionsDone + (w.sessionsPlanned ? ' / ' + w.sessionsPlanned : '') + '</b><span class="muted small">&nbsp;</span></div>' +
@@ -5841,7 +5983,9 @@ Views.trends = (function () {
         (w.kcalTarget ? 'atteint à ±10 % de ' + U.nf(w.kcalTarget, 0) : '&nbsp;') + '</span></div>' +
       cell('Pas moyens', w.steps, prev.steps, '', 0) +
       cell('Sommeil moy.', w.sleep, prev.sleep, 'h', 1) +
-      '</div></section>';
+      '</div>';
+    return '<section class="card review"><div class="card-head"><h2>Bilan de la semaine</h2></div>' +
+      nav + streakBlock(r) + seg + '<div data-review-body>' + body + '</div></section>';
   }
 
   function tdeeCard() {
@@ -6001,6 +6145,7 @@ Views.trends = (function () {
   }
 
   function render(state) {
+    if (!state.reviewView) state.reviewView = App.ls.get('reviewView', 'tiles');
     var daily = Store.list('DAILY');
     var end = U.today();
     var trend = Calc.weightTrend(daily, end, U.addDays);
@@ -6008,7 +6153,7 @@ Views.trends = (function () {
     var sleep7 = [];
     for (var i = 0; i < 7; i++) { var d = daily.filter(function (x) { return x.date === U.addDays(end, -i); })[0]; if (d && typeof d.sleepH === 'number') sleep7.push(d.sleepH); }
     var range = state.trendDays || 28;
-    return reviewCard() + tdeeCard() + '<section class="card">' +
+    return reviewCard(state) + tdeeCard() + '<section class="card">' +
       '<div class="card-head"><h2>Poids</h2><div class="pills">' + [28, 42, 90].map(function (n) {
         return '<button class="pill' + (n === range ? ' on' : '') + '" data-range="' + n + '">' + n + ' j</button>';
       }).join('') + '</div></div>' +
@@ -6061,6 +6206,10 @@ Views.trends = (function () {
         app.toast('Nouvel objectif : ' + U.nf(k, 0) + ' kcal');
         return;
       }
+      var wk = e.target.closest('[data-week]');
+      if (wk) { state.reviewWeek = (state.reviewWeek || 0) + Number(wk.getAttribute('data-week')); app.render(); return; }
+      var rv = e.target.closest('[data-review-view]');
+      if (rv) { state.reviewView = rv.getAttribute('data-review-view'); app.ls.set('reviewView', state.reviewView); app.render(); return; }
       var r = e.target.closest('[data-range]');
       if (r) { state.trendDays = Number(r.getAttribute('data-range')); app.render(); return; }
     });
