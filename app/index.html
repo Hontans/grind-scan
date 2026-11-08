@@ -1302,7 +1302,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-07 22:26 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 00:34 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2511,8 +2511,54 @@ var Calc = (function () {
     return d < 0 ? null : Math.floor(d / 7) + 1;
   }
 
+  /**
+   * Mensurations (onglet MEASURES), en cm. Bras et cuisses se mesurent des deux côtés, le bras relâché (pas contracté).
+   * MEASURES_OLD = anciennes colonnes, plus saisies mais jamais perdues : l'historique les affiche toujours
+   * (côté serveur, RETIRED_COLS_ les garde dans le Sheet tant qu'elles ont des valeurs).
+   * card: false = pas sur la carte, seulement dans l'historique.
+   */
+  var MEASURES = [
+    { key: 'waist', label: 'Tour de taille', short: 'Taille' }, { key: 'chest', label: 'Poitrine', short: 'Poitrine' },
+    { key: 'armR', label: 'Bras droit', short: 'Bras D' }, { key: 'armL', label: 'Bras gauche', short: 'Bras G' },
+    { key: 'thighR', label: 'Cuisse droite', short: 'Cuisse D' }, { key: 'thighL', label: 'Cuisse gauche', short: 'Cuisse G' }
+  ];
+  var MEASURES_OLD = [
+    { key: 'arm', label: 'Bras (ancienne mesure)', short: 'Bras' },
+    { key: 'thigh', label: 'Cuisse (ancienne mesure)', short: 'Cuisse' },
+    { key: 'hips', label: 'Hanches', short: 'Hanches', card: false }
+  ];
+
+  /** Prises qui contiennent au moins une mesure, la plus récente d'abord. */
+  function measureList(list) {
+    var all = MEASURES.concat(MEASURES_OLD);
+    return (list || []).filter(function (r) {
+      return r && r.date && all.some(function (f) { return isNum(r[f.key]); });
+    }).sort(function (a, b) { return a.date === b.date ? 0 : (a.date < b.date ? 1 : -1); });
+  }
+
+  /** Valeurs d'une prise : [{ key, label, short, v, old }], anciennes mesures comprises. */
+  function measureValues(rec) {
+    var out = [];
+    MEASURES.forEach(function (f) { if (rec && isNum(rec[f.key])) out.push({ key: f.key, label: f.label, short: f.short, v: rec[f.key], old: false }); });
+    MEASURES_OLD.forEach(function (f) { if (rec && isNum(rec[f.key])) out.push({ key: f.key, label: f.label, short: f.short, v: rec[f.key], old: true, card: f.card !== false }); });
+    return out;
+  }
+
+  /**
+   * Carte des mensurations : chaque mesure de la dernière prise, avec l'écart (cm) à la prise d'avant
+   * (null si la prise d'avant ne l'a pas). Les anciennes mesures n'y sont que si la dernière prise en a, jamais les hanches.
+   */
+  function measureCard(list) {
+    var sorted = measureList(list), last = sorted[0] || null, prev = sorted[1] || null;
+    var tiles = measureValues(last).filter(function (t) { return !t.old || t.card; }).map(function (t) {
+      return { key: t.key, label: t.label, v: t.v, d: prev && isNum(prev[t.key]) ? round(t.v - prev[t.key], 1) : null };
+    });
+    return { last: last, prev: prev, tiles: tiles, count: sorted.length };
+  }
+
   return { RATINGS: RATINGS, HUNGER: HUNGER, readiness: readiness, readinessBaseline: readinessBaseline, weightAvg: weightAvg,
-    weightTrend: weightTrend, gainStatus: gainStatus, dayPlan: dayPlan, targetFor: targetFor, weekNumber: weekNumber, mean: mean, round: round };
+    weightTrend: weightTrend, gainStatus: gainStatus, dayPlan: dayPlan, targetFor: targetFor, weekNumber: weekNumber, mean: mean, round: round,
+    MEASURES: MEASURES, MEASURES_OLD: MEASURES_OLD, measureList: measureList, measureValues: measureValues, measureCard: measureCard };
 })();
 </script>
 
@@ -5842,33 +5888,61 @@ Views.trends = (function () {
     });
   }
 
-  var MEASURE_FIELDS = [['waist', 'Tour de taille'], ['chest', 'Poitrine'], ['arm', 'Bras (contracté)'], ['thigh', 'Cuisse'], ['hips', 'Hanches']];
+  // ---------------------------------------------------------------- mensurations
 
   function measuresCard() {
-    var list = Store.list('MEASURES').slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; });
-    var last = list[0], prev = list[1];
-    return '<section class="card"><div class="card-head"><h2>Mensurations</h2><button class="link" data-measure>+ Ajouter</button></div>' +
-      (last ? '<p class="muted small">Dernière prise : ' + U.shortDate(last.date) + (prev ? ' (vs ' + U.shortDate(prev.date) + ')' : '') + '</p><div class="stats">' +
-        MEASURE_FIELDS.filter(function (f) { return typeof last[f[0]] === 'number'; }).map(function (f) {
-          var d = prev && typeof prev[f[0]] === 'number' ? last[f[0]] - prev[f[0]] : null;
-          return '<div class="stat"><span class="tile-label">' + f[1] + '</span><b>' + U.nf(last[f[0]]) + ' cm</b><span class="muted small">' + (d !== null ? U.signed(d) + ' cm' : '&nbsp;') + '</span></div>';
-        }).join('') + '</div>' : '<p class="muted">Toutes les 2 semaines, le matin, au même endroit : c\'est le meilleur complément au poids en prise de masse.</p>') +
+    var m = Calc.measureCard(Store.list('MEASURES'));
+    var head = '<div class="card-head"><h2>Mensurations</h2><button class="link" data-measure>+ Ajouter</button></div>';
+    if (!m.last) {
+      return '<section class="card">' + head + '<p class="muted">Toutes les 2 semaines, le matin, au même endroit : c\'est le meilleur complément au poids en prise de masse.</p></section>';
+    }
+    return '<section class="card">' + head +
+      '<p class="muted small">Dernière prise : ' + U.shortDate(m.last.date) + (m.prev ? ' (vs ' + U.shortDate(m.prev.date) + ')' : '') + '</p>' +
+      (m.tiles.length ? '<div class="stats">' + m.tiles.map(function (t) {
+        return '<div class="stat"><span class="tile-label">' + t.label + '</span><b>' + U.nf(t.v) + ' cm</b><span class="muted small">' + (t.d !== null ? U.signed(t.d) + ' cm' : '&nbsp;') + '</span></div>';
+      }).join('') + '</div>' : '') +
+      '<button class="btn ghost block" data-measure-hist>' + App.icon('list') + 'Historique' + (m.count > 1 ? ' (' + m.count + ' prises)' : '') + '</button>' +
       '</section>';
   }
 
-  function openMeasure(app) {
+  /** Toutes les prises, la plus récente d'abord, anciennes mesures comprises (hanches, bras et cuisse d'avant droite / gauche). */
+  function openMeasureHistory(app) {
+    var list = Calc.measureList(Store.list('MEASURES'));
     app.openSheet({
-      title: 'Mensurations du jour',
-      html: '<p class="muted small">Mètre ruban, à jeun, sans serrer.</p><div class="fields">' + MEASURE_FIELDS.map(function (f) {
-        return '<label class="field"><span class="field-label">' + f[1] + '</span><span class="field-box"><input data-k="' + f[0] + '" inputmode="decimal"><span class="unit">cm</span></span></label>';
+      title: 'Mensurations',
+      html: '<p class="muted small">En cm. Touche une prise pour la corriger.</p><ul class="list">' + list.map(function (r) {
+        return '<li><button class="food-row" data-measure-edit="' + U.esc(r.id) + '"><span class="entry-name">' + U.longDate(r.date) + ' ' + r.date.slice(0, 4) + '</span>' +
+          '<span class="muted small">' + Calc.measureValues(r).map(function (v) { return (U.esc(v.short) + ' ' + U.nf(v.v)).replace(/ /g, '&nbsp;'); }).join(' · ') +
+          (r.note ? ' · ' + U.esc(r.note) : '') + '</span></button></li>';
+      }).join('') + '</ul>',
+      bind: function (sh) {
+        sh.addEventListener('click', function (e) {
+          var b = e.target.closest('[data-measure-edit]');
+          if (!b) return;
+          var id = b.getAttribute('data-measure-edit');
+          openMeasure(app, Store.list('MEASURES').filter(function (r) { return r.id === id; })[0]);
+        });
+      }
+    });
+  }
+
+  /** Saisie d'une prise : celle du jour (reprise si elle existe déjà), ou `rec` à corriger depuis l'historique. */
+  function openMeasure(app, rec) {
+    var today = U.today();
+    rec = rec || Store.list('MEASURES').filter(function (r) { return r.id === 'm-' + today; })[0] || { id: 'm-' + today, date: today };
+    var val = function (k) { return typeof rec[k] === 'number' ? String(rec[k]).replace('.', ',') : ''; };
+    app.openSheet({
+      title: rec.date === today ? 'Mensurations du jour' : 'Mensurations du ' + U.shortDate(rec.date),
+      html: '<p class="muted small">Mètre ruban, à jeun, sans serrer. Bras relâché, le long du corps, au plus large ; cuisse au plus large.</p><div class="fields">' + Calc.MEASURES.map(function (f) {
+        return '<label class="field"><span class="field-label">' + f.label + '</span><span class="field-box"><input data-k="' + f.key + '" inputmode="decimal" value="' + val(f.key) + '"><span class="unit">cm</span></span></label>';
       }).join('') + '</div><button class="btn primary block" data-ok>Enregistrer</button>',
       bind: function (p) {
         p.querySelector('[data-ok]').addEventListener('click', function () {
-          var rec = { id: 'm-' + U.today(), date: U.today() };
-          var any = false;
-          MEASURE_FIELDS.forEach(function (f) { var v = U.parseNum(p.querySelector('[data-k="' + f[0] + '"]').value); rec[f[0]] = v; if (v !== null) any = true; });
-          if (!any) { app.toast('Aucune mesure saisie'); return; }
-          Store.put('MEASURES', rec);
+          // Les anciennes mesures de la prise (hanches…) restent telles quelles : seules les mesures saisies ici changent.
+          var out = Object.assign({}, rec), any = false;
+          Calc.MEASURES.forEach(function (f) { var v = U.parseNum(p.querySelector('[data-k="' + f.key + '"]').value); out[f.key] = v; if (v !== null) any = true; });
+          if (!any && !Calc.measureValues(out).length) { app.toast('Aucune mesure saisie'); return; }
+          Store.put('MEASURES', out);
           app.closeSheet(); app.render(); app.toast('Mensurations enregistrées');
         });
       }
@@ -5914,6 +5988,7 @@ Views.trends = (function () {
     });
     root.addEventListener('click', function (e) {
       if (e.target.closest('[data-measure]')) return openMeasure(app);
+      if (e.target.closest('[data-measure-hist]')) return openMeasureHistory(app);
       if (e.target.closest('[data-all-data]')) return openData(app, state);
       var mo = e.target.closest('[data-muscle-open]') || e.target.closest('.body-map [data-muscle]');
       if (mo) return openMuscle(app, mo.getAttribute('data-muscle-open') || mo.getAttribute('data-muscle'));
