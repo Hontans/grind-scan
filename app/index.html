@@ -916,6 +916,8 @@ p { margin: 0 0 10px; }
 .field { display: grid; gap: 7px; margin-bottom: 10px; min-width: 0; }
 .field-label { font-size: 13px; font-weight: 500; color: var(--text-2); margin: 0 2px; }
 .field-hint { font-size: 12.5px; color: var(--text-3); margin: 0 2px; }
+.measure-hint { margin: -2px 2px 12px; color: var(--text-2); }
+.measure-hint:empty { display: none; }
 .field-box {
   display: flex; align-items: center; height: 46px; border-radius: 16px; background: var(--field); box-shadow: var(--field-shadow);
   padding: 0 14px; transition: box-shadow .2s, background .2s; min-width: 0;
@@ -1302,7 +1304,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 00:34 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-08 00:52 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2556,9 +2558,29 @@ var Calc = (function () {
     return { last: last, prev: prev, tiles: tiles, count: sorted.length };
   }
 
+  /** Prise (avec au moins une mesure) d'un jour donné, hors `exceptId`, ou null. */
+  function measureAt(list, date, exceptId) {
+    return measureList(list).filter(function (r) { return r.date === date && r.id !== exceptId; })[0] || null;
+  }
+
+  /**
+   * Enregistrer une prise à la date choisie. values = { waist: 77.5, armR: null… } (champs de MEASURES).
+   * src = prise corrigée depuis l'historique, null pour une nouvelle. Une prise par jour : à une date qui en a déjà une,
+   * une nouvelle prise la complète, une prise déplacée la remplace. Les anciennes mesures (hanches…) sont gardées.
+   * Rend { put, remove } : remove = identifiant de la prise déplacée (à supprimer), sinon null.
+   */
+  function measureSave(list, src, date, values) {
+    var same = !!src && src.date === date;
+    var target = same ? null : measureAt(list, date, src && src.id);
+    var id = same ? src.id : (target ? target.id : 'm-' + date);
+    var put = Object.assign({}, target || {}, src || {}, { id: id, date: date });
+    MEASURES.forEach(function (f) { put[f.key] = isNum(values[f.key]) ? values[f.key] : null; });
+    return { put: put, remove: src && src.id !== id ? src.id : null };
+  }
+
   return { RATINGS: RATINGS, HUNGER: HUNGER, readiness: readiness, readinessBaseline: readinessBaseline, weightAvg: weightAvg,
     weightTrend: weightTrend, gainStatus: gainStatus, dayPlan: dayPlan, targetFor: targetFor, weekNumber: weekNumber, mean: mean, round: round,
-    MEASURES: MEASURES, MEASURES_OLD: MEASURES_OLD, measureList: measureList, measureValues: measureValues, measureCard: measureCard };
+    MEASURES: MEASURES, MEASURES_OLD: MEASURES_OLD, measureList: measureList, measureValues: measureValues, measureCard: measureCard, measureAt: measureAt, measureSave: measureSave };
 })();
 </script>
 
@@ -5926,24 +5948,59 @@ Views.trends = (function () {
     });
   }
 
-  /** Saisie d'une prise : celle du jour (reprise si elle existe déjà), ou `rec` à corriger depuis l'historique. */
-  function openMeasure(app, rec) {
+  /**
+   * Saisie d'une prise, à la date choisie (aujourd'hui par défaut, jamais dans le futur).
+   * Nouvelle prise (src absent) : choisir un jour qui a déjà une prise la reprend (les champs pas encore touchés se remplissent).
+   * Prise de l'historique (src) : la corriger, la déplacer à sa vraie date, ou la supprimer.
+   */
+  function openMeasure(app, src) {
     var today = U.today();
-    rec = rec || Store.list('MEASURES').filter(function (r) { return r.id === 'm-' + today; })[0] || { id: 'm-' + today, date: today };
-    var val = function (k) { return typeof rec[k] === 'number' ? String(rec[k]).replace('.', ',') : ''; };
+    var shown = src || Calc.measureAt(Store.list('MEASURES'), today);
+    var val = function (r, k) { return r && typeof r[k] === 'number' ? String(r[k]).replace('.', ',') : ''; };
     app.openSheet({
-      title: rec.date === today ? 'Mensurations du jour' : 'Mensurations du ' + U.shortDate(rec.date),
-      html: '<p class="muted small">Mètre ruban, à jeun, sans serrer. Bras relâché, le long du corps, au plus large ; cuisse au plus large.</p><div class="fields">' + Calc.MEASURES.map(function (f) {
-        return '<label class="field"><span class="field-label">' + f.label + '</span><span class="field-box"><input data-k="' + f.key + '" inputmode="decimal" value="' + val(f.key) + '"><span class="unit">cm</span></span></label>';
-      }).join('') + '</div><button class="btn primary block" data-ok>Enregistrer</button>',
+      title: src ? 'Corriger la prise' : 'Ajouter des mensurations',
+      html: '<label class="field"><span class="field-label">Date de la prise</span><input type="date" class="input" data-mdate value="' + (src ? src.date : today) + '" max="' + today + '"></label>' +
+        '<p class="field-hint measure-hint" data-mhint></p>' +
+        '<p class="muted small">Mètre ruban, à jeun, sans serrer. Bras relâché, le long du corps, au plus large ; cuisse au plus large.</p><div class="fields">' + Calc.MEASURES.map(function (f) {
+          return '<label class="field"><span class="field-label">' + f.label + '</span><span class="field-box"><input data-k="' + f.key + '" inputmode="decimal" value="' + val(shown, f.key) + '"><span class="unit">cm</span></span></label>';
+        }).join('') + '</div><button class="btn primary block" data-ok>Enregistrer</button>' +
+        (src ? '<button class="btn danger block" data-del>Supprimer cette prise</button>' : ''),
       bind: function (p) {
+        var dateIn = p.querySelector('[data-mdate]'), hint = p.querySelector('[data-mhint]');
+        var inputs = Array.prototype.slice.call(p.querySelectorAll('[data-k]'));
+        var okDate = function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= today; };
+        inputs.forEach(function (i) { i.addEventListener('input', function () { i.setAttribute('data-dirty', ''); }); });
+        var onDate = function () {
+          var d = dateIn.value, target = okDate(d) ? Calc.measureAt(Store.list('MEASURES'), d, src && src.id) : null;
+          if (d && !okDate(d)) { hint.textContent = 'Choisis un jour passé ou aujourd\'hui.'; return; }
+          if (src) {
+            var dd = U.shortDate(d) + ' ' + d.slice(0, 4);
+            hint.textContent = !d || d === src.date ? '' : target ? 'La prise du ' + dd + ' sera remplacée par celle-ci.' : 'La prise sera déplacée au ' + dd + '.';
+            return;
+          }
+          hint.textContent = target ? 'Il y a déjà une prise ce jour-là : tu la complètes.' : '';
+          inputs.forEach(function (i) { if (!i.hasAttribute('data-dirty')) i.value = val(target, i.getAttribute('data-k')); });
+        };
+        dateIn.addEventListener('change', onDate);
+        dateIn.addEventListener('input', onDate);
+        onDate();
         p.querySelector('[data-ok]').addEventListener('click', function () {
-          // Les anciennes mesures de la prise (hanches…) restent telles quelles : seules les mesures saisies ici changent.
-          var out = Object.assign({}, rec), any = false;
-          Calc.MEASURES.forEach(function (f) { var v = U.parseNum(p.querySelector('[data-k="' + f.key + '"]').value); out[f.key] = v; if (v !== null) any = true; });
-          if (!any && !Calc.measureValues(out).length) { app.toast('Aucune mesure saisie'); return; }
-          Store.put('MEASURES', out);
-          app.closeSheet(); app.render(); app.toast('Mensurations enregistrées');
+          var d = dateIn.value;
+          if (!okDate(d)) { app.toast(d ? 'Date dans le futur' : 'Choisis la date de la prise'); return; }
+          var values = {};
+          inputs.forEach(function (i) { values[i.getAttribute('data-k')] = U.parseNum(i.value); });
+          var plan = Calc.measureSave(Store.list('MEASURES'), src || null, d, values);
+          if (!Calc.measureValues(plan.put).length) { app.toast('Aucune mesure saisie'); return; }
+          Store.put('MEASURES', plan.put);
+          if (plan.remove) Store.remove('MEASURES', plan.remove);
+          app.closeSheet(); app.render();
+          app.toast(plan.remove ? 'Prise déplacée au ' + U.shortDate(d) : 'Mensurations enregistrées');
+        });
+        var del = p.querySelector('[data-del]');
+        if (del) del.addEventListener('click', function () {
+          if (!window.confirm('Supprimer la prise du ' + U.shortDate(src.date) + ' ?')) return;
+          Store.remove('MEASURES', src.id);
+          app.closeSheet(); app.render(); app.toast('Prise supprimée');
         });
       }
     });
