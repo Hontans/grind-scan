@@ -1015,6 +1015,14 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 /* nutrition : anneau des kcal et barres de macros */
 .food-summary { display: flex; align-items: center; gap: 18px; }
+/* Diète respectée ? Oui / Non (pastille teintée selon la réponse) */
+.diet-card { display: flex; align-items: center; gap: 12px; }
+.diet-txt { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.diet-txt b { font: 600 17px/1.25 var(--font); letter-spacing: -.012em; }
+.diet-seg { flex: none; width: 148px; }
+.diet-seg.is-oui.thumb::before { background: var(--accent-grad); box-shadow: var(--accent-shadow); }
+.diet-seg.is-oui button[aria-pressed="true"] { color: var(--on-accent); font-weight: 600; }
+.diet-seg.is-non button[aria-pressed="true"] { color: var(--warn); font-weight: 600; }
 .ring-wrap { position: relative; width: 120px; height: 120px; flex: none; }
 .ring-wrap .ring { width: 100%; height: 100%; }
 .ring-bg { fill: none; stroke: var(--field); stroke-width: 11; }
@@ -1256,6 +1264,9 @@ table.data tbody tr { cursor: pointer; }
 .streak-key .k-ok { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-grad); }
 .streak-key .icon { width: 13px; height: 13px; stroke-width: 2.4; color: var(--accent); }
 .streak-day small { font-size: 11px; color: var(--text-2); }
+/* Diète respectée : ✓ comme un jour réussi, ✗ = « non » noté */
+.streak-day.no i { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; vertical-align: -3px; }
 .week-nav { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px; }
 .week-nav-txt { flex: 1; display: grid; justify-items: center; gap: 1px; text-align: center; }
 .week-nav-txt b { font: 600 15px/1.2 var(--font); }
@@ -1314,7 +1325,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-08 15:40 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-09 21:32 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3077,6 +3088,31 @@ var Review = (function () {
   function mean(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
   function r(v, d) { if (v === null) return null; var k = Math.pow(10, d || 0); return Math.round(v * k) / k; }
 
+  /** Diète respectée notée pour un jour (colonne diet de DAILY) : 'oui', 'non' ou '' (pas noté). */
+  function dietOf(day) {
+    var v = day && day.diet;
+    if (v === true || v === false) return v ? 'oui' : 'non'; // case à cocher ajoutée à la main dans le Sheet
+    v = String(v == null ? '' : v).trim().toLowerCase();
+    return v === 'oui' || v === 'non' ? v : '';
+  }
+
+  /** Diète notée par jour : { 'yyyy-mm-dd': 'oui' | 'non' } (les jours pas notés n'y sont pas). */
+  function dietByDay(daily) {
+    var out = {};
+    (daily || []).forEach(function (x) { var v = dietOf(x); if (v && x.date) out[x.date] = v; });
+    return out;
+  }
+
+  /**
+   * Série de jours « diète respectée » d'affilée jusqu'à aujourd'hui (comme streak) ; un jour pas noté la casse,
+   * et un « non » noté aujourd'hui aussi, sans attendre demain. Renvoie { current, best, today: 'oui' | 'non' | '' }.
+   */
+  function dietStreak(daily, today, addDays, maxDays) {
+    var by = dietByDay(daily);
+    var s = streak(function (d) { return by[d] === 'oui'; }, today, addDays, maxDays);
+    return { current: by[today] === 'non' ? 0 : s.current, best: s.best, today: by[today] || '' };
+  }
+
   /** Calories et macros par jour : { 'yyyy-mm-dd': { kcal, p, c, f } }. */
   function intakeByDay(log) {
     var out = {};
@@ -3127,7 +3163,7 @@ var Review = (function () {
    * data = { daily, sessions, log, plannedSessions, kcalTarget(date), today }
    * Jours écoulés = jours de la semaine jusqu'à `today` (toute la semaine si absent ou passée).
    * Un jour compte « dans la cible » si ses repas saisis font ±10 % de l'objectif calories ;
-   * un jour sans repas saisis n'y est pas.
+   * un jour sans repas saisis n'y est pas. dietYes / dietNoted : jours écoulés notés « diète respectée » / notés tout court.
    */
   function week(data, from, to, addDays) {
     var days = [];
@@ -3142,6 +3178,7 @@ var Review = (function () {
     var onTarget = loggedDays.filter(function (k) { var t = target(k); return t !== null && Math.abs(intake[k].kcal - t) / t <= 0.1; });
     var targets = elapsed.map(target).filter(isNum);
     var done = (data.sessions || []).filter(function (s) { return s.date >= from && s.date <= to; }).length;
+    var diet = elapsed.map(function (d) { return dietOf(daily[d]); }).filter(Boolean);
     return {
       from: from, to: to,
       weight: r(mean(pick('weight')), 2),
@@ -3154,7 +3191,9 @@ var Review = (function () {
       protein: r(mean(loggedDays.map(function (k) { return intake[k].p; })), 0),
       days: elapsed.length,
       loggedDays: loggedDays.length,
-      onTarget: targets.length ? onTarget.length : null
+      onTarget: targets.length ? onTarget.length : null,
+      dietYes: diet.filter(function (v) { return v === 'oui'; }).length,
+      dietNoted: diet.length
     };
   }
 
@@ -3194,6 +3233,8 @@ var Review = (function () {
     lines.push('Calories moyennes : ' + (w.kcal === null ? '–' : nf(w.kcal, 0) + ' kcal') +
       (w.kcalTarget ? ' (objectif ' + nf(w.kcalTarget, 0) + ' kcal)' : '') + ', repas saisis ' + plural(w.loggedDays, 'jour') + ' sur ' + w.days);
     if (w.onTarget !== null) lines.push('Jours dans la cible calories (±10 %) : ' + w.onTarget + ' sur ' + w.days);
+    if (w.dietNoted) lines.push('Diète respectée : ' + w.dietYes + ' jour' + (w.dietYes > 1 ? 's' : '') + ' sur ' + w.days +
+      (w.dietNoted < w.days ? ' (' + plural(w.days - w.dietNoted, 'jour') + ' pas noté' + (w.days - w.dietNoted > 1 ? 's' : '') + ')' : ''));
     lines.push('Protéines moyennes : ' + (w.protein === null ? '–' : nf(w.protein, 0) + ' g'));
     lines.push('Pas moyens : ' + (w.steps === null ? '–' : nf(w.steps, 0)));
     lines.push('Sommeil moyen : ' + (w.sleep === null ? '–' : nf(w.sleep, 1) + ' h'));
@@ -3201,7 +3242,8 @@ var Review = (function () {
     return lines.join('\n');
   }
 
-  return { intakeByDay: intakeByDay, weightSlope: weightSlope, tdee: tdee, suggestedKcal: suggestedKcal, week: week, reportText: reportText, streak: streak, onTargetDay: onTargetDay };
+  return { intakeByDay: intakeByDay, weightSlope: weightSlope, tdee: tdee, suggestedKcal: suggestedKcal, week: week, reportText: reportText, streak: streak, onTargetDay: onTargetDay,
+    dietOf: dietOf, dietByDay: dietByDay, dietStreak: dietStreak };
 })();
 </script>
 
@@ -3464,7 +3506,8 @@ Views.today = (function () {
       return '<li><span>' + U.esc(e.exercise) + '</span><span class="muted">' + U.esc((e.sets || '') + ' × ' + (e.reps || '')) + '</span></li>';
     }).join('') + '</ol>' : '';
     var eaten = Nutri.totals(Nutri.dayEntries(Store.list('FOOD_LOG'), date));
-    var food = '<button class="row-link" data-go="food"><span>Nutrition</span><span class="muted">' + U.nf(eaten.kcal, 0) + (kcal ? ' / ' + U.nf(kcal, 0) : '') + ' kcal · P ' + U.nf(eaten.p, 0) + ' g</span><span class="badge">' + App.icon('right', 'xs') + '</span></button>';
+    var diet = { oui: ' · diète ✓', non: ' · diète ✗' }[Review.dietOf(Store.get('DAILY', date))] || '';
+    var food = '<button class="row-link" data-go="food"><span>Nutrition</span><span class="muted">' + U.nf(eaten.kcal, 0) + (kcal ? ' / ' + U.nf(kcal, 0) : '') + ' kcal · P ' + U.nf(eaten.p, 0) + ' g' + diet + '</span><span class="badge">' + App.icon('right', 'xs') + '</span></button>';
     var start = name && !done && date === U.today() ? '<button class="btn primary block" data-go="train">Commencer la séance</button>' : '';
     return '<section class="card">' + head + status + start + list + food + '</section>';
   }
@@ -4099,7 +4142,7 @@ window.Views = Views;
 
   <script>
 /*
- * Écran « Nutrition » (façon Yazio) : calories et macros du jour vs objectif, journal par repas.
+ * Écran « Nutrition » (façon Yazio) : calories et macros du jour vs objectif, diète respectée (oui / non), journal par repas.
  * Ajout d'un aliment : recherche dans ta base, favoris, récents, repas types, scan code-barre,
  * recherche Open Food Facts, ajout rapide, création d'un produit ou d'une recette.
  * Tout passe par Store.put : aucun appel serveur, sauf scan et recherche en ligne.
@@ -4155,6 +4198,41 @@ Views.food = (function () {
       (v.fiber == null ? '' : one('fb', 'Fi', v.fiber, 'Fibres (g)')) + '</span>';
   }
 
+  // ---------------------------------------------------------------- diète respectée (colonne diet de DAILY)
+
+  /** Série en cours (toujours jusqu'à aujourd'hui) ou invitation à noter le jour affiché. */
+  function dietHint(date) {
+    var s = Review.dietStreak(Store.list('DAILY'), U.today(), U.addDays, 400);
+    if (s.current) return 'Série : ' + s.current + ' jour' + (s.current > 1 ? 's' : '') + ' d\'affilée' + (s.best > s.current ? ' · record ' + s.best + ' j' : '');
+    var v = Review.dietOf(Store.get('DAILY', date));
+    if (!v && date !== U.today()) return 'Pas notée ce jour-là';
+    if (!v && !s.best) return 'Note-la chaque soir pour lancer ta série';
+    return 'Pas de série en cours' + (s.best ? ' · record ' + s.best + ' j' : '');
+  }
+
+  function dietCard(date) {
+    var v = Review.dietOf(Store.get('DAILY', date));
+    return '<section class="card diet-card"><div class="diet-txt"><b>Diète respectée ?</b><span class="muted small" data-diet-hint>' + U.esc(dietHint(date)) + '</span></div>' +
+      '<div class="seg diet-seg' + (v ? ' is-' + v : '') + '" role="group" aria-label="Diète respectée ce jour">' + [['oui', 'Oui'], ['non', 'Non']].map(function (o) {
+        return '<button type="button" data-diet="' + o[0] + '" aria-pressed="' + (v === o[0]) + '">' + o[1] + '</button>';
+      }).join('') + '</div></section>';
+  }
+
+  /** Oui / Non pour le jour affiché ; toucher à nouveau la réponse choisie l'efface. Sans recharger l'écran. */
+  function setDiet(b) {
+    var date = state.date;
+    var day = Store.get('DAILY', date) || { id: date, date: date };
+    var next = Review.dietOf(day) === b.getAttribute('data-diet') ? null : b.getAttribute('data-diet');
+    Store.put('DAILY', Object.assign({}, day, { diet: next }));
+    var seg = b.parentNode;
+    seg.querySelectorAll('[data-diet]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-diet') === next)); });
+    seg.classList.toggle('is-oui', next === 'oui');
+    seg.classList.toggle('is-non', next === 'non');
+    var hint = seg.parentNode.querySelector('[data-diet-hint]');
+    if (hint) hint.textContent = dietHint(date);
+    app.haptic();
+  }
+
   function render(st, a) {
     app = a; state = st;
     var date = st.date;
@@ -4195,7 +4273,7 @@ Views.food = (function () {
       '<button class="btn soft" data-open="targets">Objectifs</button>' +
       '<button class="btn soft" data-open="foods">Mes aliments</button>' +
       '<button class="btn soft" data-open="recipes">Mes recettes</button></div>';
-    return summary + cards + tools;
+    return summary + dietCard(date) + cards + tools;
   }
 
   function header(st) { return Views.dateHeader(st, 'Nutrition'); }
@@ -4207,6 +4285,7 @@ Views.food = (function () {
       if ((b = e.target.closest('[data-add]'))) return openAdd(b.getAttribute('data-add'));
       if ((b = e.target.closest('[data-entry]'))) return openEntry(b.getAttribute('data-entry'));
       if ((b = e.target.closest('[data-copy]'))) return copyYesterday(b.getAttribute('data-copy'));
+      if ((b = e.target.closest('[data-diet]'))) return setDiet(b);
       if ((b = e.target.closest('[data-open]'))) {
         var w = b.getAttribute('data-open');
         if (w === 'targets') return openTargets();
@@ -5741,9 +5820,10 @@ Views.trends = (function () {
       var date = U.addDays(end, -i), d = m[date] || {}, k = intake[date];
       var s = Calc.readiness(d);
       rows += '<tr data-goto="' + date + '"><td>' + U.dayLetter(date) + ' ' + U.shortDate(date) + '</td><td>' + U.nf(d.weight) + '</td><td>' +
-        (k && k.kcal ? U.nf(k.kcal, 0) : '–') + '</td><td>' + (d.steps ? U.nf(d.steps, 0) : '–') + '</td><td>' + U.nf(d.sleepH) + '</td><td>' + (s === null ? '–' : U.nf(s)) + '</td></tr>';
+        (k && k.kcal ? U.nf(k.kcal, 0) : '–') + '</td><td>' + (d.steps ? U.nf(d.steps, 0) : '–') + '</td><td>' + U.nf(d.sleepH) + '</td><td>' + (s === null ? '–' : U.nf(s)) + '</td>' +
+        '<td class="diet-cell">' + ({ oui: App.icon('check'), non: App.icon('x') }[Review.dietOf(d)] || '–') + '</td></tr>';
     }
-    return '<div class="table-wrap"><table class="data"><thead><tr><th>Jour</th><th>Poids</th><th>Kcal</th><th>Pas</th><th>Sommeil</th><th>Forme</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    return '<div class="table-wrap"><table class="data"><thead><tr><th>Jour</th><th>Poids</th><th>Kcal</th><th>Pas</th><th>Sommeil</th><th>Forme</th><th>Diète</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
   /** Toutes les séances faites (les plus récentes d'abord) : [{ key, date, name, exercises: [{ name, sets }], sets, volume }]. */
@@ -5952,6 +6032,29 @@ Views.trends = (function () {
       '<p class="streak-key muted small"><span><i class="k-ok"></i>calories dans la cible</span><span>' + App.icon('check') + 'séance faite</span></p></div>';
   }
 
+  /** Diète respectée (Oui / Non noté dans Nutrition) : série en cours et record, pastilles de la semaine affichée. */
+  function dietBlock(r) {
+    var today = U.today(), daily = Store.list('DAILY');
+    var by = Review.dietByDay(daily);
+    var st = Review.dietStreak(daily, today, U.addDays, 400);
+    var dots = '', yes = 0, days = 0;
+    for (var d = r.from; d <= r.to; d = U.addDays(d, 1)) {
+      var v = by[d];
+      if (d <= today) days++;
+      if (v === 'oui') yes++;
+      var cls = d > today ? 'future' : v === 'oui' ? 'ok' : v === 'non' ? 'no' : d === today ? 'pending' : 'miss';
+      dots += '<span class="streak-day ' + cls + '"><i>' + (v === 'oui' ? App.icon('check') : v === 'non' ? App.icon('x') : '') + '</i><small>' + 'LMMJVSD'.charAt(U.dow(d) - 1) + '</small></span>';
+    }
+    var title = st.current ? st.current + ' jour' + (st.current > 1 ? 's' : '') + ' d\'affilée' : 'Pas de série en cours';
+    var hint = !st.best && !st.current ? 'Réponds Oui ou Non chaque jour dans Nutrition'
+      : 'Diète respectée ' + yes + ' jour' + (yes > 1 ? 's' : '') + ' sur ' + days + (r.to < today ? '' : ' cette semaine');
+    return '<div class="streak diet' + (st.current ? ' on' : '') + '">' +
+      '<div class="streak-head"><span class="streak-flame">' + App.icon('food') + '</span>' +
+      '<div class="streak-txt"><b>' + title + '</b><span class="muted small">' + hint + '</span></div>' +
+      '<div class="streak-best"><b>' + st.best + ' j</b><span class="muted small">record</span></div></div>' +
+      '<div class="streak-week" aria-label="Diète respectée ' + yes + ' jour' + (yes > 1 ? 's' : '') + ' cette semaine-là">' + dots + '</div></div>';
+  }
+
   function weekSummary(offset) {
     var r = weekRange(offset);
     var w = Review.week({ daily: Store.list('DAILY'), sessions: Store.list('SESSIONS'), log: Store.list('FOOD_LOG'),
@@ -5995,7 +6098,7 @@ Views.trends = (function () {
       cell('Sommeil moy.', w.sleep, prev.sleep, 'h', 1) +
       '</div>';
     return '<section class="card review"><div class="card-head"><h2>Bilan de la semaine</h2></div>' +
-      nav + streakBlock(r) + body + '</section>';
+      nav + streakBlock(r) + dietBlock(r) + body + '</section>';
   }
 
   function tdeeCard() {
