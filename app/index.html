@@ -1023,6 +1023,17 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .diet-seg.is-oui.thumb::before { background: var(--accent-grad); box-shadow: var(--accent-shadow); }
 .diet-seg.is-oui button[aria-pressed="true"] { color: var(--on-accent); font-weight: 600; }
 .diet-seg.is-non button[aria-pressed="true"] { color: var(--warn); font-weight: 600; }
+.diet-treat { justify-self: start; padding: 2px 0; text-align: left; }
+/* Écart du jour : quatre tailles en tuiles, un toucher suffit */
+.treat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 14px; }
+.treat-opt { display: grid; gap: 2px; padding: 12px 13px; border-radius: 20px; background: var(--field); box-shadow: var(--field-shadow); text-align: left; transition: transform .4s var(--spring); }
+.treat-opt:active { transform: scale(.96); }
+.treat-opt b { font: 600 16px/1.2 var(--font); }
+.treat-opt span { font-weight: 600; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.treat-opt small { font-size: 12px; color: var(--text-3); line-height: 1.3; }
+.treat-opt.on { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.treat-row { display: flex; align-items: flex-end; gap: 8px; }
+.treat-row .btn { height: 46px; margin-bottom: 10px; flex: none; }
 .ring-wrap { position: relative; width: 120px; height: 120px; flex: none; }
 .ring-wrap .ring { width: 100%; height: 100%; }
 .ring-bg { fill: none; stroke: var(--field); stroke-width: 11; }
@@ -1325,7 +1336,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-09 21:32 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-09 22:03 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2828,7 +2839,27 @@ var Nutri = (function () {
     return { name: name, kcal: r0(t.kcal * k), p: r1(t.p * k), c: r1(t.c * k), f: r1(t.f * k), fiber: fiberKnown ? r1(t.fiber * k) : null, category: 'Recette', source: 'recette' };
   }
 
-  return { DEFAULT_MEALS: DEFAULT_MEALS, meals: meals, forQty: forQty, fiberOf: fiberOf, stateOf: stateOf, cookYield: cookYield, refQty: refQty, entryFiber: entryFiber, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
+  /**
+   * Écart du jour (diète pas respectée, pas pesé) : calories en plus estimées d'un geste, une ligne par jour
+   * dans le journal (id ecart-<date>, repas « Écart ») pour que le bilan et les calories adaptatives restent justes.
+   */
+  var TREATS = [
+    { key: 's', label: 'Petit', kcal: 300, hint: 'un dessert, quelques biscuits' },
+    { key: 'm', label: 'Moyen', kcal: 700, hint: 'resto, apéro, fast-food' },
+    { key: 'l', label: 'Gros', kcal: 1200, hint: 'repas de fête, dessert copieux' },
+    { key: 'xl', label: 'Très gros', kcal: 2000, hint: 'buffet, pizza + dessert + boissons' }
+  ];
+  var TREAT_MEAL = 'Écart';
+  function treatId(date) { return 'ecart-' + date; }
+
+  /** Ligne du journal pour un écart de `kcal` : macros d'un repas plaisir type (10 % protéines, 45 % glucides, 45 % lipides). */
+  function treat(date, kcal) {
+    var k = Math.round(Number(kcal) || 0);
+    return { id: treatId(date), date: date, meal: TREAT_MEAL, foodId: '', name: 'Écart (estimation)', qty: null, state: '',
+      kcal: k, p: r1(k * 0.10 / 4), c: r1(k * 0.45 / 4), f: r1(k * 0.45 / 9), fiber: null };
+  }
+
+  return { DEFAULT_MEALS: DEFAULT_MEALS, TREATS: TREATS, TREAT_MEAL: TREAT_MEAL, treatId: treatId, treat: treat, meals: meals, forQty: forQty, fiberOf: fiberOf, stateOf: stateOf, cookYield: cookYield, refQty: refQty, entryFiber: entryFiber, totals: totals, dayEntries: dayEntries, dayTargets: dayTargets,
     search: search, recents: recents, mealTemplates: mealTemplates, recipeKey: recipeKey, recipeRows: recipeRows, recipe: recipe, norm: norm };
 })();
 </script>
@@ -4210,15 +4241,25 @@ Views.food = (function () {
     return 'Pas de série en cours' + (s.best ? ' · record ' + s.best + ' j' : '');
   }
 
+  /** Sous « Diète respectée ? » : la série, ou après un « non » l'écart estimé (toucher pour l'ajouter ou le corriger). */
+  function dietSub(date) {
+    if (Review.dietOf(Store.get('DAILY', date)) !== 'non') return '<span class="muted small">' + U.esc(dietHint(date)) + '</span>';
+    var t = Store.get('FOOD_LOG', Nutri.treatId(date));
+    return '<button type="button" class="link diet-treat" data-treat>' + (t ? 'Écart estimé : +' + U.nf(t.kcal, 0) + ' kcal' : '+ Estimer l\'écart') + '</button>';
+  }
+
   function dietCard(date) {
     var v = Review.dietOf(Store.get('DAILY', date));
-    return '<section class="card diet-card"><div class="diet-txt"><b>Diète respectée ?</b><span class="muted small" data-diet-hint>' + U.esc(dietHint(date)) + '</span></div>' +
+    return '<section class="card diet-card"><div class="diet-txt"><b>Diète respectée ?</b><span data-diet-sub>' + dietSub(date) + '</span></div>' +
       '<div class="seg diet-seg' + (v ? ' is-' + v : '') + '" role="group" aria-label="Diète respectée ce jour">' + [['oui', 'Oui'], ['non', 'Non']].map(function (o) {
         return '<button type="button" data-diet="' + o[0] + '" aria-pressed="' + (v === o[0]) + '">' + o[1] + '</button>';
       }).join('') + '</div></section>';
   }
 
-  /** Oui / Non pour le jour affiché ; toucher à nouveau la réponse choisie l'efface. Sans recharger l'écran. */
+  /**
+   * Oui / Non pour le jour affiché ; toucher à nouveau la réponse choisie l'efface. Sans recharger l'écran.
+   * « Non » ouvre l'estimation de l'écart (sauf s'il est déjà estimé) ; l'écart déjà noté reste dans le journal.
+   */
   function setDiet(b) {
     var date = state.date;
     var day = Store.get('DAILY', date) || { id: date, date: date };
@@ -4228,9 +4269,46 @@ Views.food = (function () {
     seg.querySelectorAll('[data-diet]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.getAttribute('data-diet') === next)); });
     seg.classList.toggle('is-oui', next === 'oui');
     seg.classList.toggle('is-non', next === 'non');
-    var hint = seg.parentNode.querySelector('[data-diet-hint]');
-    if (hint) hint.textContent = dietHint(date);
+    var sub = seg.parentNode.querySelector('[data-diet-sub]');
+    if (sub) sub.innerHTML = dietSub(date);
     app.haptic();
+    if (next === 'non' && !Store.get('FOOD_LOG', Nutri.treatId(date))) openTreat();
+  }
+
+  /** « Combien en plus, à peu près ? » : un toucher sur une taille (ou un chiffre) écrit l'écart du jour dans le journal. */
+  function openTreat() {
+    var date = state.date;
+    var cur = Store.get('FOOD_LOG', Nutri.treatId(date));
+    var save = function (kcal) {
+      Store.put('FOOD_LOG', Nutri.treat(date, kcal));
+      after('Écart de ' + U.nf(kcal, 0) + ' kcal ajouté au journal');
+    };
+    app.openSheet({
+      title: 'Écart du jour',
+      html: '<p class="muted">Combien en plus, à peu près ? Une estimation suffit : elle garde ton bilan et ta dépense estimée justes.</p>' +
+        '<div class="treat-grid">' + Nutri.TREATS.map(function (t) {
+          return '<button type="button" class="treat-opt' + (cur && cur.kcal === t.kcal ? ' on' : '') + '" data-kcal="' + t.kcal + '"><b>' + U.esc(t.label) + '</b>' +
+            '<span>+' + U.nf(t.kcal, 0) + ' kcal</span><small>' + U.esc(t.hint) + '</small></button>';
+        }).join('') + '</div>' +
+        '<div class="treat-row"><label class="field grow"><span class="field-label">Ou ton estimation</span><span class="field-box">' +
+        '<input data-kcal-in inputmode="numeric" placeholder="1500" value="' + (cur ? cur.kcal : '') + '"><span class="unit">kcal</span></span></label>' +
+        '<button class="btn primary" data-treat-ok>' + (cur ? 'Corriger' : 'Ajouter') + '</button></div>' +
+        '<p class="muted small">Ajouté au journal dans « ' + Nutri.TREAT_MEAL + ' » (environ 10 % de protéines, 45 % de glucides, 45 % de lipides). ' +
+        'Si tu connais ce que tu as mangé, ajoute plutôt les aliments.</p>' +
+        (cur ? '<button class="btn danger block" data-treat-del>Retirer l\'écart</button>' : ''),
+      bind: function (p) {
+        p.addEventListener('click', function (e) {
+          var b;
+          if ((b = e.target.closest('[data-kcal]'))) return save(Number(b.getAttribute('data-kcal')));
+          if (e.target.closest('[data-treat-ok]')) {
+            var k = U.parseNum(p.querySelector('[data-kcal-in]').value);
+            if (!k || k <= 0) { app.toast('Indique des calories'); return; }
+            return save(k);
+          }
+          if (e.target.closest('[data-treat-del]')) { Store.remove('FOOD_LOG', Nutri.treatId(date)); return after('Écart retiré'); }
+        });
+      }
+    });
   }
 
   function render(st, a) {
@@ -4286,6 +4364,7 @@ Views.food = (function () {
       if ((b = e.target.closest('[data-entry]'))) return openEntry(b.getAttribute('data-entry'));
       if ((b = e.target.closest('[data-copy]'))) return copyYesterday(b.getAttribute('data-copy'));
       if ((b = e.target.closest('[data-diet]'))) return setDiet(b);
+      if (e.target.closest('[data-treat]')) return openTreat();
       if ((b = e.target.closest('[data-open]'))) {
         var w = b.getAttribute('data-open');
         if (w === 'targets') return openTargets();
@@ -4517,6 +4596,7 @@ Views.food = (function () {
   function openEntry(id) {
     var e = Store.get('FOOD_LOG', id);
     if (!e) return;
+    if (id === Nutri.treatId(e.date)) return openTreat(); // écart estimé : même feuille que depuis « Diète respectée ? »
     var food = e.foodId && foodById(e.foodId);
     if (food) return openQty(food, { meal: e.meal, qty: e.qty, entry: e });
     openQuick(e.meal, e);
