@@ -1106,6 +1106,13 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 }
 .pick-row .pill:active { transform: scale(1.05, .9); transition: transform .14s var(--ease-out); }
 .pick-row .pill.on { background: var(--accent-grad); color: var(--on-accent); box-shadow: var(--accent-shadow); }
+/* séance avec son jour attitré : nom, puis le jour en petit ; les cinq tiennent sur une ligne (sinon défilement) */
+.pick-row:has(.has-day) { gap: 4px; }
+.pick-row .pill.has-day { flex: 1 0 auto; height: 42px; padding: 0 8px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 16px; }
+.pick-row .pill .pick-name { line-height: 1.15; }
+.pick-row .pill .pick-day { font: 500 10.5px/1.1 var(--font); color: var(--text-3); }
+.pick-row .pill.on .pick-day { color: inherit; opacity: .8; }
+.pick-row .pill.has-day .today-dot { top: 3px; right: 3px; }
 .today-dot { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg); }
 .pill.on .today-dot { background: var(--on-accent); box-shadow: none; }
 .start-main { display: flex; align-items: center; gap: 12px; }
@@ -1336,7 +1343,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-09 22:03 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-09 22:16 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2531,6 +2538,26 @@ var Calc = (function () {
     return d ? { session: d.session || '', on: !!d.on, steps: d.steps || null, cardio: d.cardio || '' } : { session: '', on: false, steps: null, cardio: '' };
   }
 
+  /**
+   * Jours attitrés de chaque séance : { 'Bas A': [2], … } (1 = lundi), d'après le planning de la semaine ;
+   * une séance absente du planning garde le jour de sa ligne du programme (colonne dow), sinon [].
+   */
+  function sessionDays(settings, program) {
+    var planning = [], out = {};
+    try { planning = JSON.parse((settings && settings.planning) || '[]'); } catch (e) { planning = []; }
+    planning.slice().sort(function (a, b) { return a.dow - b.dow; }).forEach(function (d) {
+      if (!d.session || !(d.dow >= 1 && d.dow <= 7)) return;
+      var list = out[d.session] = out[d.session] || [];
+      if (list.indexOf(d.dow) < 0) list.push(d.dow);
+    });
+    (program || []).forEach(function (p) {
+      if (!p.session || out[p.session]) return;
+      var dow = Number(p.dow);
+      out[p.session] = dow >= 1 && dow <= 7 ? [dow] : [];
+    });
+    return out;
+  }
+
   /** Objectif en vigueur à une date : le dernier dont `from` <= date. */
   function targetFor(targets, date) {
     var best = null;
@@ -2611,7 +2638,7 @@ var Calc = (function () {
   }
 
   return { RATINGS: RATINGS, HUNGER: HUNGER, readiness: readiness, readinessBaseline: readinessBaseline, weightAvg: weightAvg,
-    weightTrend: weightTrend, gainStatus: gainStatus, dayPlan: dayPlan, targetFor: targetFor, weekNumber: weekNumber, mean: mean, round: round,
+    weightTrend: weightTrend, gainStatus: gainStatus, dayPlan: dayPlan, sessionDays: sessionDays, targetFor: targetFor, weekNumber: weekNumber, mean: mean, round: round,
     MEASURES: MEASURES, MEASURES_OLD: MEASURES_OLD, measureList: measureList, measureValues: measureValues, measureCard: measureCard, measureAt: measureAt, measureSave: measureSave };
 })();
 </script>
@@ -3011,10 +3038,11 @@ var Train = (function () {
     ['Grand dorsal', /tirage|traction|pull ?over|pulldown|lat\b/],
     ['Épaules', /elevation|militaire|developpe (epaule|halteres assis)|oiseau|face ?pull|arnold|shoulder/],
     ['Avant-bras', /poignet|avant.?bras|forearm|wrist/],
+    // Ischios avant biceps : « Leg curl couché » est un curl de jambes.
+    ['Ischios', /leg curl|curl (jambe|ischio|allonge|assis)|rdl|roumain|good morning|ischio/],
     ['Biceps', /curl(?! jambe| ischio| allonge| assis)|biceps/],
     ['Triceps', /triceps|barre au front|kick ?back|dips/],
     ['Quadriceps', /squat|presse|leg extension|fente|hack|extension (des )?jambes|sissy/],
-    ['Ischios', /leg curl|curl (jambe|ischio|allonge|assis)|rdl|roumain|good morning|ischio/],
     ['Adducteurs', /adduct/],
     ['Fessiers', /hip thrust|fessier|abduct|kickback fess|glute/],
     ['Mollets', /mollet|calf/],
@@ -3022,7 +3050,7 @@ var Train = (function () {
     ['Lombaires', /hyperextension|lombaire|superman/]
   ];
   // Exercices qui ciblent plusieurs groupes (tous principaux, une série compte pour chacun) :
-  // les tirages et rowings répartis sur les muscles du dos, les dips sur triceps et pectoraux.
+  // les tirages et rowings répartis sur les muscles du dos, les dips sur triceps et pectoraux, les fentes sur quadriceps et fessiers.
   // Pas de muscles « secondaires » : un développé ne compte pas pour les épaules ni les triceps.
   // Seule la première règle qui correspond s'applique.
   // Rowing prise large (coudes ouverts) : haut du dos, pas le grand dorsal. Autres rowings (prise serrée, neutre,
@@ -3031,7 +3059,8 @@ var Train = (function () {
   var ALSO = [
     [/(rowing|row\b|tirage horizontal).*(large|coudes? (ouverts?|ecartes?))/, []],
     [/rowing|row\b|tirage horizontal|tirage poitrine/, ['Grand dorsal']],
-    [/dips/, ['Pectoraux']]
+    [/dips/, ['Pectoraux']],
+    [/fente/, ['Fessiers']]
   ];
   // Anciens noms de groupes (onglet EXERCISES) → noms actuels.
   var RENAMED = { Dos: 'Grand dorsal', 'Grand rond': 'Grand dorsal', Trapezes: 'Trapèzes', Rhomboides: 'Rhomboïdes' };
@@ -3792,10 +3821,20 @@ Views.train = (function () {
   function programFor(name) {
     return Store.list('PROGRAM').filter(function (p) { return p.session === name; }).sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
   }
+  /** Jours attitrés de chaque séance (planning de la semaine, sinon colonne dow du programme) : { 'Bas A': [2] }. */
+  function sessionDays() { return Calc.sessionDays(Store.list('SETTINGS'), Store.list('PROGRAM')); }
+  /** Séances du programme, dans l'ordre de la semaine (celles sans jour attitré à la fin). */
   function sessionNames() {
-    var seen = {}, out = [];
-    Store.list('PROGRAM').slice().sort(function (a, b) { return (a.dow || 9) - (b.dow || 9); }).forEach(function (p) { if (!seen[p.session]) { seen[p.session] = 1; out.push(p.session); } });
-    return out;
+    var seen = {}, out = [], days = sessionDays();
+    var first = function (n) { return (days[n] && days[n][0]) || 9; };
+    Store.list('PROGRAM').forEach(function (p) { if (p.session && !seen[p.session]) { seen[p.session] = 1; out.push(p.session); } });
+    return out.sort(function (a, b) { return first(a) - first(b) || a.localeCompare(b); });
+  }
+  var DAY_NAMES = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+  /** « Mardi », « Lun · Jeu » pour une séance faite deux fois, '' sans jour attitré. */
+  function dayLabel(list) {
+    if (!list || !list.length) return '';
+    return list.length === 1 ? DAY_NAMES[list[0] - 1] : list.map(function (d) { return DAY_NAMES[d - 1].slice(0, 3); }).join(' · ');
   }
   /** Série déjà enregistrée pour cette séance (créée par l'app ou importée du logbook du coach). */
   function savedSet(w, exercise, n) {
@@ -3845,14 +3884,18 @@ Views.train = (function () {
     var muscles = [];
     prog.forEach(function (p) { Train.musclesOf(p.exercise, Store.list('EXERCISES')).forEach(function (m) { if (muscles.indexOf(m) < 0) muscles.push(m); }); });
     var last = Store.list('SESSIONS').filter(function (s) { return s.name === name && s.date < U.today(); }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
+    var days = sessionDays(), myDay = dayLabel(days[name]);
     return '<section class="card start-card">' +
       '<div class="pick-row">' + sessionNames().map(function (n) {
-        return '<button class="pill' + (n === name ? ' on' : '') + '" data-pick="' + U.esc(n) + '">' + U.esc(n) + (n === today ? '<i class="today-dot" aria-label="prévue aujourd\'hui"></i>' : '') + '</button>';
+        var d = dayLabel(days[n]);
+        return '<button class="pill' + (d ? ' has-day' : '') + (n === name ? ' on' : '') + '" data-pick="' + U.esc(n) + '">' +
+          '<span class="pick-name">' + U.esc(n) + '</span>' + (d ? '<small class="pick-day">' + U.esc(d) + '</small>' : '') +
+          (n === today ? '<i class="today-dot" aria-label="prévue aujourd\'hui"></i>' : '') + '</button>';
       }).join('') + '</div>' +
       '<div class="start-main"><div class="start-text">' +
       '<span class="tile-label">' + (name === today ? 'Prévue aujourd\'hui' : today ? 'Hors planning (aujourd\'hui : ' + U.esc(today) + ')' : 'Repos aujourd\'hui' + (next.session === name ? ' · prochaine séance ' + (next.days === 1 ? 'demain' : U.longDate(U.addDays(U.today(), next.days)).split(' ')[0].toLowerCase()) : '')) + '</span>' +
       '<h2>' + U.esc(name) + '</h2>' +
-      '<p class="muted small">' + prog.length + ' exercices · ' + nSets + ' séries' + (last ? ' · dernière fois ' + U.dayLetter(last.date) + ' ' + U.shortDate(last.date) : '') + '</p>' +
+      '<p class="muted small">' + (myDay ? (days[name].length === 1 ? 'Le ' + myDay.toLowerCase() : myDay) + ' · ' : '') + prog.length + ' exercices · ' + nSets + ' séries' + (last ? ' · dernière fois ' + U.dayLetter(last.date) + ' ' + U.shortDate(last.date) : '') + '</p>' +
       '<p class="muted small">' + muscles.map(U.esc).join(' · ') + '</p></div>' +
       '<div class="start-body">' + Body.mini(muscles) + '</div></div>' +
       '<button class="btn primary block" data-start="' + U.esc(name) + '">Démarrer la séance</button>' +
