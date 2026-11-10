@@ -1343,7 +1343,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-09 22:16 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-10 23:48 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -4783,7 +4783,8 @@ Views.food = (function () {
     };
     app.openSheet({
       title: 'Objectifs nutrition',
-      html: '<p class="muted small">S\'appliquent à partir d\'aujourd\'hui. Les jours ON/OFF suivent le planning de la semaine.</p>' +
+      html: '<p class="muted small">S\'appliquent à partir de la date choisie (aujourd\'hui par défaut). Les jours ON/OFF suivent le planning de la semaine.</p>' +
+        '<label class="field"><span class="field-label">À partir du</span><input type="date" class="input" data-from value="' + U.today() + '"></label>' +
         '<div class="fields">' + num('kcalOn', 'Jour ON', 'kcal', cur.kcalOn) + num('kcalOff', 'Jour OFF', 'kcal', cur.kcalOff) +
         num('protPerKg', 'Protéines', 'g/kg', s.protPerKg || 2) + num('fatPerKg', 'Lipides', 'g/kg', s.fatPerKg || 1) +
         num('steps', 'Objectif de pas', 'pas', cur.steps) + '</div>' +
@@ -4793,12 +4794,12 @@ Views.food = (function () {
         p.querySelector('[data-ok]').addEventListener('click', function () {
           var n = function (k) { return U.parseNum(p.querySelector('[data-k="' + k + '"]').value); };
           if (!n('kcalOn')) { app.toast('Indique au moins les kcal du jour ON'); return; }
-          var today = U.today();
-          Store.put('TARGETS', { id: 'u-' + today, from: today, kcalOn: Math.round(n('kcalOn')), kcalOff: Math.round(n('kcalOff') || n('kcalOn')),
+          var from = p.querySelector('[data-from]').value || U.today();
+          Store.put('TARGETS', { id: 'u-' + from, from: from, kcalOn: Math.round(n('kcalOn')), kcalOff: Math.round(n('kcalOff') || n('kcalOn')),
             steps: n('steps'), note: 'Modifié dans l\'app' });
           if (n('protPerKg')) Store.put('SETTINGS', { key: 'protPerKg', value: n('protPerKg') });
           if (n('fatPerKg')) Store.put('SETTINGS', { key: 'fatPerKg', value: n('fatPerKg') });
-          after('Objectifs enregistrés');
+          after(from === U.today() ? 'Objectifs enregistrés' : 'Objectifs enregistrés à partir du ' + U.shortDate(from));
         });
       }
     });
