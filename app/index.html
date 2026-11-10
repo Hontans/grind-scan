@@ -1282,8 +1282,6 @@ table.data tbody tr { cursor: pointer; }
 .streak-key .k-ok { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-grad); }
 .streak-key .icon { width: 13px; height: 13px; stroke-width: 2.4; color: var(--accent); }
 .streak-day small { font-size: 11px; color: var(--text-2); }
-/* Diète respectée : ✓ comme un jour réussi, ✗ = « non » noté */
-.streak-day.no i { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
 table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; vertical-align: -3px; }
 .week-nav { display: flex; align-items: center; gap: 6px; margin: -4px 0 10px; }
 .week-nav-txt { flex: 1; display: grid; justify-items: center; gap: 1px; text-align: center; }
@@ -1343,7 +1341,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-10 23:48 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-10 23:50 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -6156,29 +6154,6 @@ Views.trends = (function () {
       '<p class="streak-key muted small"><span><i class="k-ok"></i>calories dans la cible</span><span>' + App.icon('check') + 'séance faite</span></p></div>';
   }
 
-  /** Diète respectée (Oui / Non noté dans Nutrition) : série en cours et record, pastilles de la semaine affichée. */
-  function dietBlock(r) {
-    var today = U.today(), daily = Store.list('DAILY');
-    var by = Review.dietByDay(daily);
-    var st = Review.dietStreak(daily, today, U.addDays, 400);
-    var dots = '', yes = 0, days = 0;
-    for (var d = r.from; d <= r.to; d = U.addDays(d, 1)) {
-      var v = by[d];
-      if (d <= today) days++;
-      if (v === 'oui') yes++;
-      var cls = d > today ? 'future' : v === 'oui' ? 'ok' : v === 'non' ? 'no' : d === today ? 'pending' : 'miss';
-      dots += '<span class="streak-day ' + cls + '"><i>' + (v === 'oui' ? App.icon('check') : v === 'non' ? App.icon('x') : '') + '</i><small>' + 'LMMJVSD'.charAt(U.dow(d) - 1) + '</small></span>';
-    }
-    var title = st.current ? st.current + ' jour' + (st.current > 1 ? 's' : '') + ' d\'affilée' : 'Pas de série en cours';
-    var hint = !st.best && !st.current ? 'Réponds Oui ou Non chaque jour dans Nutrition'
-      : 'Diète respectée ' + yes + ' jour' + (yes > 1 ? 's' : '') + ' sur ' + days + (r.to < today ? '' : ' cette semaine');
-    return '<div class="streak diet' + (st.current ? ' on' : '') + '">' +
-      '<div class="streak-head"><span class="streak-flame">' + App.icon('food') + '</span>' +
-      '<div class="streak-txt"><b>' + title + '</b><span class="muted small">' + hint + '</span></div>' +
-      '<div class="streak-best"><b>' + st.best + ' j</b><span class="muted small">record</span></div></div>' +
-      '<div class="streak-week" aria-label="Diète respectée ' + yes + ' jour' + (yes > 1 ? 's' : '') + ' cette semaine-là">' + dots + '</div></div>';
-  }
-
   function weekSummary(offset) {
     var r = weekRange(offset);
     var w = Review.week({ daily: Store.list('DAILY'), sessions: Store.list('SESSIONS'), log: Store.list('FOOD_LOG'),
@@ -6222,7 +6197,7 @@ Views.trends = (function () {
       cell('Sommeil moy.', w.sleep, prev.sleep, 'h', 1) +
       '</div>';
     return '<section class="card review"><div class="card-head"><h2>Bilan de la semaine</h2></div>' +
-      nav + streakBlock(r) + dietBlock(r) + body + '</section>';
+      nav + streakBlock(r) + body + '</section>';
   }
 
   function tdeeCard() {
