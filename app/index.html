@@ -1226,7 +1226,9 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
   --pos: #8BE3A8; --neg: #FF9C92; --warn: #F0CC7A; }
 html.pose-open { overflow: hidden; }
 html.pose-open #lq { display: none; }
-.pose-live video { position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+/* la vidéo reste affichée (Safari met en pause une vidéo invisible) ; le canevas par-dessus ne dessine que le squelette */
+.pose-live video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.pose-live video.mirror { transform: scaleX(-1); }
 .pose-cv { position: absolute; inset: 0; width: 100%; height: 100%; }
 .pose-top { position: absolute; top: calc(var(--sat) + 8px); left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pose-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, .5); color: #fff; }
@@ -1485,7 +1487,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-12 03:17 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-12 03:20 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -4962,7 +4964,7 @@ var Pose = (function () {
     root.setAttribute('role', 'dialog');
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-label', 'Analyse de ' + skill.name);
-    root.innerHTML = '<video playsinline muted data-pv></video><canvas class="pose-cv" data-pc></canvas>' +
+    root.innerHTML = '<video playsinline muted autoplay data-pv></video><canvas class="pose-cv" data-pc></canvas>' +
       '<div class="pose-top">' +
       '<button class="pose-btn" data-px aria-label="Fermer l\'analyse">' + App.icon('x') + '</button>' +
       '<div class="pose-title"><b>' + U.esc(skill.name) + '</b>' + (level ? '<span>' + U.esc(level.name) + '</span>' : '') + '</div>' +
@@ -4995,6 +4997,7 @@ var Pose = (function () {
       navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (s) {
         if (closed) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
         stream = s;
+        video.classList.toggle('mirror', facing === 'user');
         video.srcObject = s;
         return video.play().then(function () { if (!eng) say('Chargement de l\'analyse… (la première fois, environ 20 Mo)'); });
       }).catch(function () { say('Caméra refusée ou indisponible : autorise la caméra pour Grind, puis relance.'); });
@@ -5022,10 +5025,9 @@ var Pose = (function () {
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
       if (!vw || !vh) return;
-      // image entière visible (ce qui est analysé = ce qu'on voit), en miroir pour la caméra frontale
+      // même cadrage que la vidéo affichée dessous (image entière, en miroir pour la caméra frontale)
       var sc = Math.min(W / vw, H / vh), dw = vw * sc, dh = vh * sc, dx = (W - dw) / 2, dy = (H - dh) / 2;
       if (facing === 'user') { g.translate(W, 0); g.scale(-1, 1); }
-      g.drawImage(video, dx, dy, dw, dh);
       var p = lastPts;
       if (!p) return;
       var X = function (i) { return dx + p[i].x * dw; }, Y = function (i) { return dy + p[i].y * dh; };
@@ -5366,13 +5368,15 @@ Views.cali = (function () {
     Pose.open(app, {
       skill: sk, level: many(sk) ? Cali.level(sk, lv) : null,
       onDone: function (best) {
-        var sec = Math.floor(best.sec), note = 'Analyse : score ' + U.nf(best.score, 1) + '/10' + (best.clean ? ', ' + U.nf(best.clean, 1) + ' s propres' : '');
+        var f1 = function (v) { return (Math.round(v * 10) / 10).toFixed(1).replace('.', ','); };
+        var sec = Math.floor(best.sec), score = best.score == null ? '' : 'score ' + f1(best.score) + '/10';
+        var note = 'Analyse' + (score ? ' : ' + score : '') + (best.clean ? ', ' + f1(best.clean) + ' s propres' : '');
         var rows = root.querySelectorAll('[data-crow]'), free = null;
         for (var i = 0; i < rows.length && !free; i++) if (!rows[i].classList.contains('done')) free = rows[i];
-        if (!free || sec < 1) { app.toast('Tenu ' + U.nf(best.sec, 1) + ' s · score ' + U.nf(best.score, 1) + '/10'); return; }
+        if (!free || sec < 1) { app.toast('Tenu ' + f1(best.sec) + ' s' + (score ? ' · ' + score : '')); return; }
         free.querySelector('[data-val]').value = sec;
         validate(root, Number(free.getAttribute('data-crow')), note);
-        app.toast('Série ' + free.getAttribute('data-crow') + ' : ' + sec + ' s · score ' + U.nf(best.score, 1) + '/10');
+        app.toast('Série ' + free.getAttribute('data-crow') + ' : ' + sec + ' s' + (score ? ' · ' + score : ''));
       }
     });
   }
