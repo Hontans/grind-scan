@@ -1124,6 +1124,99 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .center { text-align: center; }
 .start-card .center { margin-top: 8px; font-size: 12px; }
 
+/* séance : musculation ou calisthénie */
+.train-mode { margin: 0 0 12px; }
+
+/* calisthénie : silhouettes des paliers, même physique que le mannequin (muscles gris, ceux de la figure allumés).
+   Le liseré de chaque muscle prend la couleur du fond (--pic-bg) : c'est lui qui sépare les muscles. */
+.cali-picto { display: block; overflow: visible; --bm-base: color-mix(in srgb, var(--text) 24%, var(--bg)); }
+.cp-m, .cp-i { fill: var(--bm-base); stroke: var(--pic-bg, var(--card-base)); stroke-linejoin: round; }
+.cp-m.on { fill: var(--accent); }
+.cp-far { opacity: .55; }
+.cp-prop { fill: none; stroke: var(--text-3); stroke-linecap: round; stroke-linejoin: round; }
+
+/* calisthénie : les quatre figures */
+.cali-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.cali-tile { text-align: left; gap: 2px; padding: 9px 9px 11px; transition: transform .9s var(--liquid); }
+.cali-tile:active { transform: scale(1.03, .95); transition: transform .14s var(--ease-out); }
+.cali-tile .ct-fig { display: block; height: 76px; margin-bottom: 5px; padding: 3px 8px; border-radius: 15px; background: var(--card-2); --pic-bg: color-mix(in srgb, var(--text) 5%, var(--card-base)); }
+.cali-tile .cali-picto { width: 100%; height: 100%; }
+.cali-tile .ct-name, .cali-tile .ct-level, .cali-tile .ct-dots, .cali-tile .tile-note { margin: 0 3px; }
+.cali-tile .ct-name { font: 600 15px/1.25 var(--font); letter-spacing: -.01em; }
+.cali-tile .ct-level { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.ct-dots { display: flex; gap: 3px; min-height: 4px; margin: 5px 0 4px; }
+.ct-dots i { flex: 1; height: 4px; border-radius: 2px; background: var(--field); }
+.ct-dots i.done { background: var(--accent); opacity: .5; }
+.ct-dots i.now { background: var(--accent); }
+.cali-tile.on { background: linear-gradient(var(--card-base), var(--card-base)) padding-box, var(--accent-grad) border-box; }
+.cali-tile.on .ct-fig { background: var(--accent-soft); --pic-bg: color-mix(in srgb, var(--accent) 14%, var(--card-base)); }
+.cali-tile.on .ct-level { color: var(--accent-ink); }
+
+/* calisthénie : figure du jour */
+.cali-top { display: flex; gap: 12px; align-items: flex-start; }
+.cali-top .ex-fig { margin-top: 2px; }
+.cali-top .start-text { justify-items: start; }
+.cali-top .ex-video { margin-top: 4px; }
+.cali-sub { margin: 14px 2px 8px; }
+.lv-row { display: flex; gap: 6px; overflow-x: auto; margin: 0 -17px 12px; padding: 2px 17px 4px; scrollbar-width: none; }
+.lv-row::-webkit-scrollbar { display: none; }
+.lv {
+  flex: none; width: 104px; display: grid; justify-items: center; gap: 1px; padding: 6px 4px 9px; border-radius: 19px;
+  background: var(--field); box-shadow: var(--field-shadow); color: var(--text-2); --pic-bg: color-mix(in srgb, var(--text) 7%, var(--card-base));
+  transition: background .25s var(--ease-out), color .2s, transform .9s var(--liquid);
+}
+.lv:active { transform: scale(1.05, .92); transition: transform .14s var(--ease-out); }
+.lv .cali-picto { width: 94px; height: 56px; margin-bottom: 2px; }
+.lv-name { font: 600 13px/1.2 var(--font); color: var(--text); white-space: nowrap; }
+.lv small { display: inline-flex; align-items: center; gap: 2px; font: 500 11.5px/1.3 var(--font); color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lv small .icon { width: 12px; height: 12px; stroke-width: 2.6; }
+.lv.done small { color: var(--accent-ink); }
+.lv.next .cali-picto { opacity: .5; }
+.lv.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); --pic-bg: color-mix(in srgb, var(--accent) 14%, var(--card-base)); }
+.lv.on .lv-name, .lv.on small { color: var(--accent-ink); }
+.next-lv { margin: -2px 0 8px; }
+.cali-row { grid-template-columns: 26px 1fr 1fr 46px; }
+.cali-row.solo { grid-template-columns: 26px 1fr 46px; }
+.chrono-btn { height: 44px; padding: 0 10px; gap: 6px; font-size: 14px; }
+.set-row.done .chrono-btn { background: transparent; box-shadow: none; color: var(--accent-ink); }
+
+/* calisthénie : chrono des figures statiques */
+.chrono { display: grid; justify-items: center; gap: 14px; padding: 4px 0 2px; }
+.chrono-dial { position: relative; width: min(66vw, 250px); aspect-ratio: 1; }
+.chrono-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.chrono-dial .track { fill: none; stroke: var(--field); stroke-width: 11; }
+.chrono-dial .val { fill: none; stroke: var(--accent); stroke-width: 11; stroke-linecap: round; transition: stroke .3s; }
+.chrono.goal .chrono-dial .val { stroke: var(--pos); }
+.chrono-dial .rec-mark { fill: var(--text); stroke: var(--card-base); stroke-width: 2.5; }
+.chrono-read { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.chrono-t { font: 700 68px/1 var(--font); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.chrono-t small { font-size: 32px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+.chrono-sub { margin-top: 6px; font-size: 14.5px; color: var(--text-2); }
+.chrono.goal .chrono-sub { color: var(--pos); font-weight: 600; }
+.chrono-marks { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.chrono-marks span { height: 30px; padding: 0 12px; border-radius: 999px; background: var(--field); font-size: 13px; line-height: 30px; color: var(--text-2); }
+.chrono-marks b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chrono .chrono-stop { height: 64px; font-size: 18px; margin-top: 4px; }
+
+/* calisthénie : parcours des paliers */
+.cali-path { list-style: none; margin: 0; padding: 0; }
+.cali-path li { position: relative; display: grid; grid-template-columns: 22px 74px 1fr; gap: 10px; align-items: center; padding: 5px 0; }
+.cali-path li::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+.cali-path li:first-child::before { top: 50%; }
+.cali-path li:last-child::before { bottom: 50%; }
+.cali-path li.cp-done::before { background: var(--accent); opacity: .45; }
+.cp-dot { position: relative; z-index: 1; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); box-shadow: inset 0 0 0 2px var(--line); }
+.cp-dot .icon { width: 12px; height: 12px; stroke-width: 2.8; }
+.cp-done .cp-dot { background: var(--accent); color: var(--on-accent); box-shadow: none; }
+.cp-now .cp-dot { background: var(--card-base); box-shadow: inset 0 0 0 6px var(--accent), 0 0 0 4px var(--accent-soft); }
+.cp-fig { display: block; height: 44px; padding: 2px 4px; border-radius: 12px; background: var(--card-2); --pic-bg: color-mix(in srgb, var(--text) 5%, var(--card-base)); }
+.cp-fig .cali-picto { width: 100%; height: 100%; }
+.cp-now .cp-fig { background: var(--accent-soft); --pic-bg: color-mix(in srgb, var(--accent) 14%, var(--card-base)); }
+.cp-next .cp-fig, .cp-next .cp-text { opacity: .55; }
+.cp-text { display: grid; gap: 1px; min-width: 0; }
+.cp-text b { font: 600 14.5px/1.25 var(--font); }
+.cp-text .muted.small { font-size: 12.5px; line-height: 1.35; }
+
 /* séance : tête d'exercice */
 .ex-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
 .ex-fig { flex: none; width: 52px; height: 92px; padding: 2px 0; border-radius: 14px; background: var(--card-2); display: grid; place-items: center; }
@@ -1341,7 +1434,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-10 23:50 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-12 02:43 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3134,6 +3227,272 @@ var Train = (function () {
 
   <script>
 /*
+ * Calisthénie (calculs purs, testés dans test/client.test.js) : figures, paliers de progression, records, conseil.
+ * Une ligne de l'onglet CALI = une série : { id, date, skill, level, setNo, sec, reps, note }.
+ * Figures statiques (planche, front lever, handstand) : durée tenue en secondes ; muscle-up : répétitions.
+ * Pas de surcharge. Le palier en cours est celui de la dernière série, sinon celui choisi.
+ */
+var Cali = (function () {
+  /**
+   * Figures et paliers, du plus facile au plus dur. goal = objectif du palier (secondes ou reps) à tenir
+   * sur GOAL_SETS séries d'une même séance pour proposer le palier suivant.
+   */
+  var SKILLS = [
+    { id: 'planche', name: 'Planche', kind: 'hold', goal: 10, muscles: ['Épaules', 'Pectoraux', 'Abdos'],
+      levels: [{ id: 'lean', name: 'Lean', goal: 20 }, { id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }] },
+    { id: 'front', name: 'Front lever', kind: 'hold', goal: 10, muscles: ['Grand dorsal', 'Rhomboïdes', 'Abdos'],
+      levels: [{ id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'one-leg', name: 'One leg' }, { id: 'half-lay', name: 'Half lay' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }] },
+    { id: 'muscleup', name: 'Muscle-up', kind: 'reps', goal: null, muscles: ['Grand dorsal', 'Pectoraux', 'Triceps', 'Biceps'],
+      levels: [{ id: 'strict', name: 'Strict' }] },
+    { id: 'handstand', name: 'Handstand', kind: 'hold', goal: 30, muscles: ['Épaules', 'Triceps', 'Trapèzes'],
+      levels: [{ id: 'back-wall', name: 'Dos au mur', goal: 60 }, { id: 'free', name: 'Libre' }] }
+  ];
+  var GOAL_SETS = 3;
+
+  function skill(id) { return SKILLS.filter(function (s) { return s.id === id; })[0] || null; }
+  function levelIdx(sk, lv) { for (var i = 0; i < sk.levels.length; i++) if (sk.levels[i].id === lv) return i; return -1; }
+  function level(sk, lv) { return sk.levels[levelIdx(sk, lv)] || null; }
+  function goalOf(sk, lv) { var l = level(sk, lv); return (l && l.goal) || sk.goal; }
+  function valOf(sk, r) { var v = sk.kind === 'reps' ? r.reps : r.sec; return typeof v === 'number' && isFinite(v) && v > 0 ? v : null; }
+  function unit(sk, v) { return sk.kind === 'reps' ? (v > 1 ? 'reps' : 'rep') : 's'; }
+
+  function of(logs, sk, lv) {
+    return (logs || []).filter(function (r) { return r.skill === sk.id && (!lv || r.level === lv) && valOf(sk, r) !== null; });
+  }
+
+  /** Palier en cours : le choix fait à l'écran s'il y en a un, sinon celui de la dernière série, sinon le premier. */
+  function current(logs, sk, picked) {
+    if (picked && levelIdx(sk, picked) >= 0) return picked;
+    var list = of(logs, sk).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.setNo || 0) - (a.setNo || 0); });
+    return list.length ? list[0].level : sk.levels[0].id;
+  }
+
+  /** Record sur un palier (hors une série) : secondes ou reps, null sans historique. */
+  function best(logs, sk, lv, exceptId) {
+    var b = null;
+    of(logs, sk, lv).forEach(function (r) { if (r.id !== exceptId && (b === null || valOf(sk, r) > b)) b = valOf(sk, r); });
+    return b;
+  }
+
+  /** Dernière séance sur ce palier avant `date` : { date, sets }. */
+  function last(logs, sk, lv, beforeDate) {
+    var list = of(logs, sk, lv).filter(function (r) { return !beforeDate || r.date < beforeDate; });
+    if (!list.length) return null;
+    var d = list.reduce(function (m, r) { return r.date > m ? r.date : m; }, '');
+    return { date: d, sets: list.filter(function (r) { return r.date === d; }).sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); }) };
+  }
+
+  /** Une entrée par séance (de la plus ancienne) sur un palier : meilleure série, total, séries. */
+  function progress(logs, sk, lv) {
+    var days = {};
+    of(logs, sk, lv).forEach(function (r) {
+      var d = days[r.date] = days[r.date] || { date: r.date, best: 0, total: 0, sets: [] };
+      var v = valOf(sk, r);
+      if (v > d.best) d.best = v;
+      d.total += v;
+      d.sets.push(r);
+    });
+    return Object.keys(days).sort().map(function (k) {
+      days[k].sets.sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); });
+      return days[k];
+    });
+  }
+
+  /** Objectif du palier atteint dans une séance : GOAL_SETS séries au moins à l'objectif (jamais sans objectif). */
+  function goalMet(sk, lv, sets) {
+    var g = goalOf(sk, lv);
+    return !!g && (sets || []).filter(function (r) { return valOf(sk, r) >= g; }).length >= GOAL_SETS;
+  }
+
+  /**
+   * Parcours d'une figure : chaque palier avec son record, sa première séance, la séance où l'objectif a été tenu
+   * et son état (done = dépassé, now = en cours, next = pas encore).
+   */
+  function path(logs, sk, cur) {
+    var ci = levelIdx(sk, cur);
+    return sk.levels.map(function (l, i) {
+      var p = progress(logs, sk, l.id);
+      var met = p.filter(function (d) { return goalMet(sk, l.id, d.sets); })[0];
+      return { level: l, best: best(logs, sk, l.id), first: p.length ? p[0].date : null, sessions: p.length,
+        metOn: met ? met.date : null, state: i < ci ? 'done' : i === ci ? 'now' : 'next' };
+    });
+  }
+
+  /**
+   * Conseil pour la séance, d'après la dernière fois sur ce palier : objectif tenu → palier suivant (next) ;
+   * sinon + 1 s (ou + 1 rep) sur la meilleure série (aim). Sans objectif (muscle-up) : + 1 rep, avec le record.
+   */
+  function suggest(logs, sk, lv, today) {
+    var prev = last(logs, sk, lv, today), g = goalOf(sk, lv), i = levelIdx(sk, lv), nxt = sk.levels[i + 1];
+    var u = function (v) { return v + (sk.kind === 'reps' ? ' rep' + (v > 1 ? 's' : '') : ' s'); };
+    var goal = g ? GOAL_SETS + ' × ' + u(g) : '';
+    if (!prev) return { aim: null, text: g ? 'Objectif du palier : ' + goal : 'Premières séries : note tes répétitions' };
+    var top = Math.max.apply(null, prev.sets.map(function (r) { return valOf(sk, r); }));
+    if (!g) {
+      var b = best(logs, sk, lv);
+      return { aim: top + 1, text: 'Vise ' + u(top + 1) + ' à la série 1' + (b > top ? ' · record ' + u(b) : '') };
+    }
+    if (goalMet(sk, lv, prev.sets)) {
+      return nxt ? { aim: null, next: nxt.id, text: goal + ' tenus le ' + U.shortDate(prev.date) + ' : passe en ' + nxt.name.toLowerCase() + ' ?' }
+        : { aim: top + 1, text: goal + ' tenus : vise ' + u(top + 1) };
+    }
+    return { aim: top + 1, text: 'Vise ' + u(top + 1) + ' · objectif ' + goal + (nxt ? ' pour passer en ' + nxt.name.toLowerCase() : '') };
+  }
+
+  // ---------------------------------------------------------------- silhouettes (même physique que le mannequin)
+
+  /*
+   * Silhouette de profil construite sur un squelette : chaque muscle est une forme pleine posée d'un côté de l'os
+   * (avant ou arrière), séparée de ses voisines par un mince jour, comme les muscles du mannequin (Body).
+   * Les muscles travaillés par la figure sont allumés (couleur d'accent), les autres restent gris.
+   * Pose : S = haut du tronc (épaules), P = hanche, C = courbure du dos (facultatif), H = tête,
+   * arm = [main] ou [coude, poignet, main], leg = [genou, cheville, pointe du pied], far* = membres de l'autre côté (plus sombres).
+   * sT : côté du ventre par rapport au sens épaules → hanches (±1) ; sA : côté du biceps par rapport au sens épaule → main.
+   */
+  var GAP = 0.1;
+  // [côté (+1 avant / −1 arrière / 0 les deux), t début, t fin, demi-largeurs (début, milieu, fin), groupe du mannequin,
+  //  arrondi du début, arrondi de la fin] : bouts francs entre deux muscles voisins, arrondis au bout d'un membre.
+  var TORSO = [
+    [-1, 0, .25, [4.4, 5.7, 6], 'Trapèzes', .35, .04], [-1, .25, .66, [6, 6.2, 4.9], 'Grand dorsal', .04, .04], [-1, .66, .99, [4.9, 4.6, 5.1], 'Lombaires', .04, .3],
+    [+1, .02, .38, [4.6, 6.7, 5.9], 'Pectoraux', .35, .1], [+1, .38, .58, [5.9, 5.8, 5.7], 'Abdos', .04, .04], [+1, .58, .78, [5.7, 5.6, 5.5], 'Abdos', .04, .04], [+1, .78, .99, [5.5, 5.4, 5.2], 'Abdos', .04, .3]
+  ];
+  var UPPER = [[-1, .2, .97, [3.7, 4.2, 3], 'Triceps', .25, .3], [+1, .26, .97, [3.3, 3.9, 2.7], 'Biceps', .25, .3]];
+  var DELT = [0, -.14, .38, [4.4, 5.1, 4], 'Épaules', .5, .5];
+  var FORE = [[0, .02, .99, [3.3, 3.2, 2.2], 'Avant-bras', .3, .35]];
+  var THIGH = [[-1, .24, .97, [4.9, 5, 3.5], 'Ischios', .25, .35], [+1, .04, .97, [5.4, 5.8, 3.9], 'Quadriceps', .2, .35]];
+  var GLUTE = [-1, -.2, .36, [5.8, 7, 5.2], 'Fessiers', .5, .5];
+  var SHIN = [[+1, .04, .97, [3, 2.9, 2.3], null, .25, .4], [-1, .03, .76, [3.8, 5.2, 2.9], 'Mollets', .35, .5]];
+  // « Rhomboïdes » (sous les trapèzes) ne se voient pas de profil : allumés avec les trapèzes.
+  var SEEN_AS = { 'Rhomboïdes': 'Trapèzes' };
+
+  function bone(A, B, C) {
+    var d = function (t) { return C ? [2 * (1 - t) * (C[0] - A[0]) + 2 * t * (B[0] - C[0]), 2 * (1 - t) * (C[1] - A[1]) + 2 * t * (B[1] - C[1])] : [B[0] - A[0], B[1] - A[1]]; };
+    var at = function (t) {
+      if (t < 0) { var d0 = d(0); return [A[0] + t * d0[0], A[1] + t * d0[1]]; }
+      if (t > 1) { var d1 = d(1); return [B[0] + (t - 1) * d1[0], B[1] + (t - 1) * d1[1]]; }
+      if (!C) return [A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])];
+      var u = 1 - t;
+      return [u * u * A[0] + 2 * u * t * C[0] + t * t * B[0], u * u * A[1] + 2 * u * t * C[1] + t * t * B[1]];
+    };
+    var nrm = function (t) { var v = d(Math.max(0, Math.min(1, t))), l = Math.sqrt(v[0] * v[0] + v[1] * v[1]) || 1; return [-v[1] / l, v[0] / l]; };
+    return { at: at, n: nrm };
+  }
+  function f1(v) { return (Math.round(v * 10) / 10).toString(); }
+  /** Courbe lisse (Catmull-Rom) passant par les points. */
+  function smooth(pts, move) {
+    var o = move ? 'M' + f1(pts[0][0]) + ' ' + f1(pts[0][1]) : '';
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      o += ' C' + f1(p1[0] + (p2[0] - p0[0]) / 6) + ' ' + f1(p1[1] + (p2[1] - p0[1]) / 6) + ' ' + f1(p2[0] - (p3[0] - p1[0]) / 6) + ' ' + f1(p2[1] - (p3[1] - p1[1]) / 6) + ' ' + f1(p2[0]) + ' ' + f1(p2[1]);
+    }
+    return o;
+  }
+  /** Un muscle : forme pleine d'un côté de l'os (ou des deux), bouts arrondis (spec[5] = part arrondie, 0,5 = ovale). */
+  function piece(bn, sign, spec) {
+    var side = spec[0] * sign, t0 = spec[1], t1 = spec[2], w = spec[3], r0 = spec[5] == null ? .3 : spec[5], r1 = spec[6] == null ? r0 : spec[6], N = 14, out = [], inn = [];
+    for (var i = 0; i <= N; i++) {
+      var s = (1 - Math.cos(Math.PI * i / N)) / 2, t = t0 + (t1 - t0) * s, p = bn.at(t), n = bn.n(t);
+      var wi = s < .5 ? w[0] + (w[1] - w[0]) * s * 2 : w[1] + (w[2] - w[1]) * (s - .5) * 2;
+      var rr = s < .5 ? r0 : r1, mm = Math.min(s, 1 - s), x = mm >= rr ? 0 : 1 - mm / rr, e = Math.sqrt(Math.max(0, 1 - x * x));
+      if (!spec[0]) { out.push([p[0] + n[0] * wi * e, p[1] + n[1] * wi * e]); inn.push([p[0] - n[0] * wi * e, p[1] - n[1] * wi * e]); }
+      else { var r = GAP + (wi - GAP) * e; out.push([p[0] + n[0] * side * r, p[1] + n[1] * side * r]); inn.push([p[0] + n[0] * side * GAP, p[1] + n[1] * side * GAP]); }
+    }
+    var d = smooth(out, true);
+    if (spec[0]) return d + ' L' + f1(inn[N][0]) + ' ' + f1(inn[N][1]) + ' L' + f1(inn[0][0]) + ' ' + f1(inn[0][1]) + 'Z';
+    var back = inn.reverse();
+    return d + ' L' + f1(back[0][0]) + ' ' + f1(back[0][1]) + smooth(back, false) + 'Z';
+  }
+  function lerp(A, B, t) { return [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t]; }
+  function dist(A, B) { return Math.sqrt((B[0] - A[0]) * (B[0] - A[0]) + (B[1] - A[1]) * (B[1] - A[1])); }
+
+  function body(f, lit) {
+    var out = '', far = '';
+    var m = function (d, g) { return '<path class="cp-m' + (g && lit.indexOf(g) >= 0 ? ' on' : '') + '" d="' + d + '"/>'; };
+    var i = function (d) { return '<path class="cp-i" d="' + d + '"/>'; };
+    var dot = function (c, r) { return '<circle class="cp-i" cx="' + f1(c[0]) + '" cy="' + f1(c[1]) + '" r="' + r + '"/>'; };
+    var leg = function (l) {
+      var th = bone(f.P, l[0]), sh = bone(l[0], l[1]), ft = bone(l[1], l[2]), o = '';
+      THIGH.forEach(function (sp) { o += m(piece(th, f.sT, sp), sp[4]); });
+      o += dot(l[0], 3.4);
+      SHIN.forEach(function (sp) { o += m(piece(sh, f.sT, sp), sp[4]); });
+      o += i(piece(ft, 1, [0, -.12, 1, [2.4, 2.3, 1.6], null, .45, .55]));
+      return o;
+    };
+    var arm = function (a) {
+      var E = a.length === 3 ? a[0] : null, W = a[a.length - 2], Hd = a[a.length - 1];
+      if (!E) E = lerp(f.S, W, 15 / dist(f.S, W));
+      var up = bone(f.S, E), fo = bone(E, W), hd = bone(W, Hd), o = '';
+      UPPER.forEach(function (sp) { o += m(piece(up, f.sA, sp), sp[4]); });
+      o += dot(E, 2.9);
+      FORE.forEach(function (sp) { o += m(piece(fo, f.sA, sp), sp[4]); });
+      o += i(piece(hd, 1, [0, -.08, 1.05, [2.1, 2.5, 1.9], null, .5, .5]));
+      o += m(piece(up, f.sA, DELT), DELT[4]);
+      return o;
+    };
+    if (f.farLeg) far += leg(f.farLeg);
+    if (f.farArm) far += arm(f.farArm);
+    var tr = bone(f.S, f.P, f.C), nk = bone(f.S, f.H);
+    TORSO.forEach(function (sp) { out += m(piece(tr, f.sT, sp), sp[4]); });
+    out += leg(f.leg);
+    out += m(piece(bone(f.P, f.leg[0]), f.sT, GLUTE), GLUTE[4]);
+    out += i(piece(nk, 1, [0, -.1, .6, [3.1, 2.8, 2.8], null, .2, .2]));
+    out += '<circle class="cp-i" cx="' + f1(f.H[0]) + '" cy="' + f1(f.H[1]) + '" r="' + (f.hr || 5.5) + '"/>';
+    out += arm(f.arm);
+    return (far ? '<g class="cp-far">' + far + '</g>' : '') + out;
+  }
+
+  // Poses (repères en unités du cadre ; tronc 26, bras 28 + main, jambe 41 + pied).
+  var FLOOR = 'M4 57.5 H96';
+  var FIG = {
+    planche: { vb: '0 0 100 60', props: [FLOOR],
+      base: { sT: -1, sA: -1, H: [92, 25], S: [82.5, 25], P: [56.5, 25], arm: [[73, 53.5], [67.5, 55.8]], leg: [[35.5, 25], [15.5, 25], [9.5, 25]] },
+      lean: { H: [88.8, 24.5], S: [80, 28], P: [55.8, 37.6], arm: [[68, 54], [62.3, 56]], leg: [[36.3, 45.3], [17.7, 52.7], [13, 57.2]] },
+      tuck: { H: [86.7, 33.7], S: [80, 27], C: [70, 17], P: [59, 22], arm: [[72, 54], [66.5, 56]], leg: [[74, 36], [55, 40], [49.6, 41.1]] },
+      'adv-tuck': { leg: [[58.5, 45.9], [39, 42.5], [33.6, 41.6]] },
+      straddle: { leg: [[35.6, 27.6], [15.7, 30.2], [9.8, 31]], farLeg: [[35.7, 22.2], [15.9, 19.6], [10.1, 18.8]] },
+      full: {}
+    },
+    front: { vb: '0 0 100 60', props: ['M19 4.2 H63'],
+      base: { sT: -1, sA: -1, H: [8, 33], S: [17.5, 33], P: [43.5, 33], arm: [[31.7, 8.9], [34.4, 4.2]], leg: [[64.5, 33], [84.5, 33], [90.5, 33]] },
+      tuck: { H: [8.9, 28.9], C: [28, 38], P: [38, 30], leg: [[27, 15.5], [45, 22], [50.2, 23.9]] },
+      'adv-tuck': { leg: [[42, 12], [62, 13], [67.5, 13.3]] },
+      'one-leg': { farLeg: [[42, 12], [62, 13], [67.5, 13.3]] },
+      'half-lay': { leg: [[64.5, 33], [65.5, 53], [65.8, 58.5]] },
+      straddle: { leg: [[64.4, 35.6], [84.2, 38.4], [90.1, 39.2]], farLeg: [[64.4, 30.4], [84.2, 27.6], [90.1, 26.8]] },
+      full: {}
+    },
+    muscleup: { vb: '0 0 150 90', props: ['M52 47 H112', 'M47 78 C39 60 41 38 56 23', 'M50 23.5 L56.5 22.6 L55.6 29.2'],
+      base: { sT: -1, sA: -1, H: [80.5, 9.2], S: [78.5, 18.5], P: [73, 44], arm: [[80, 45.5], [84.5, 46.5]], leg: [[70.5, 64.8], [68.3, 84.6], [67.6, 89.6]] },
+      strict: {}
+    },
+    handstand: { vb: '0 0 180 108', props: ['M34 106 H146'],
+      base: { sT: -1, sA: 1, H: [84, 82], S: [90, 75.5], P: [90, 49.5], arm: [[90, 103.5], [84.5, 104.6]], leg: [[90, 28.5], [90, 8.5], [90, 3]] },
+      'back-wall': { props: ['M34 106 H146', 'M108 1 V106'], H: [87, 82.5], S: [94, 76], C: [91, 61], P: [99.5, 51], arm: [[95, 103.5], [89.5, 104.6]], leg: [[103.2, 30.4], [104.8, 10.5], [105.2, 5]] },
+      free: {}
+    }
+  };
+
+  /** Silhouette d'un palier (muscles de la figure allumés). */
+  function picto(skillId, lv, cls) {
+    var set = FIG[skillId], sk = skill(skillId), l = sk && level(sk, lv);
+    if (!set || !sk) return '';
+    var f = {}, k, base = set.base, ov = set[lv] || {};
+    for (k in base) f[k] = base[k];
+    for (k in ov) f[k] = ov[k];
+    var vb = set.vb.split(' ').map(Number), sw = (2.2 * vb[2] / 100).toFixed(2);
+    var lit = sk.muscles.map(function (g) { return SEEN_AS[g] || g; });
+    var props = (ov.props || set.props).map(function (d) { return '<path class="cp-prop" stroke-width="' + sw + '" d="' + d + '"/>'; }).join('');
+    return '<svg class="cali-picto ' + (cls || '') + '" viewBox="' + set.vb + '" role="img" aria-label="' + U.esc(sk.name + (l && sk.levels.length > 1 ? ' ' + l.name : '')) + '">' + props +
+      '<g class="cp-body" stroke-width="' + (0.6 * vb[2] / 100).toFixed(2) + '">' + body(f, lit) + '</g></svg>';
+  }
+
+  return { SKILLS: SKILLS, GOAL_SETS: GOAL_SETS, skill: skill, level: level, levelIdx: levelIdx, goalOf: goalOf, valOf: valOf, unit: unit,
+    current: current, best: best, last: last, progress: progress, goalMet: goalMet, path: path, suggest: suggest, picto: picto };
+})();
+</script>
+
+  <script>
+/*
  * Bilans (purs, testés) : résumé d'une semaine et estimation de la dépense réelle.
  *
  * Dépense estimée (méthode « adaptive TDEE », comme MacroFactor) : sur les 21 derniers jours,
@@ -3319,8 +3678,11 @@ var Review = (function () {
 var Store = (function () {
   var PREFIX = 'grind:';
   var KEYS = { DAILY: 'daily', SESSIONS: 'sessions', SETS: 'sets', FOOD_LOG: 'foodLog', FOODS: 'foods', MEALS: 'meals',
-    TARGETS: 'targets', PROGRAM: 'program', EXERCISES: 'exercises', MEASURES: 'measures', PHOTOS: 'photos', VIDEOS: 'videos' };
+    TARGETS: 'targets', PROGRAM: 'program', EXERCISES: 'exercises', MEASURES: 'measures', PHOTOS: 'photos', VIDEOS: 'videos', CALI: 'cali' };
   var DEBOUNCE_MS = 15000;
+  // Onglets récents : envoyés seulement quand le serveur déployé les connaît (sa réponse api_boot contient leur clé).
+  // Avant la mise à jour d'Apps Script, ces saisies attendent dans la file : un ancien serveur refuserait tout le lot.
+  var NEWER = { CALI: 'cali' };
 
   var data = null;
   var queue = {};      // { TABLE: { id: record } }
@@ -3330,6 +3692,7 @@ var Store = (function () {
   var timer = null, retryMs = 0;
   var listeners = [];
   var status = { pending: 0, syncing: false, error: null, lastSync: null };
+  var known = null; // clés du dernier api_boot reçu du serveur
 
   var LS = {
     get: function (k, d) { try { var v = localStorage.getItem(PREFIX + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -3373,6 +3736,8 @@ var Store = (function () {
 
   /** boot = données du serveur (ou null si la page n'a pas pu les lire). */
   function init(boot) {
+    if (boot && boot.builtAt) { known = Object.keys(boot); LS.set('serverKeys', known); }
+    else if (!known) known = LS.get('serverKeys', null);
     var saved = LS.get('queue', { put: {}, del: {} });
     queue = saved.put || {};
     dels = saved.del || {};
@@ -3426,6 +3791,7 @@ var Store = (function () {
     var tables = {};
     Object.keys(queue).concat(Object.keys(dels)).forEach(function (t) { tables[t] = true; });
     Object.keys(tables).forEach(function (t) {
+      if (!serverKnows(t)) return;
       var puts = Object.keys(queue[t] || {}).map(function (id) { return queue[t][id]; });
       var ds = Object.keys(dels[t] || {});
       if (!puts.length && !ds.length) return;
@@ -3434,6 +3800,7 @@ var Store = (function () {
       puts.forEach(function (r) { sent.put[t][idOf(t, r)] = r.updatedAt; });
       sent.del[t] = ds;
     });
+    if (!ops.length) return; // tout ce qui attend est pour un onglet que le serveur ne connaît pas encore
     inflight = sent;
     syncs++;
     status.syncing = true;
@@ -3465,6 +3832,8 @@ var Store = (function () {
       })
       .api_sync(JSON.stringify({ ops: ops }));
   }
+
+  function serverKnows(t) { return !NEWER[t] || !!known && known.indexOf(NEWER[t]) >= 0; }
 
   function list(table) { return table === 'SETTINGS' ? data.settings : (data[KEYS[table]] || []); }
   function get(table, id) { return list(table).filter(function (r) { return r.id === id; })[0] || null; }
@@ -3721,9 +4090,10 @@ var Videos = (function () {
     }).join('') + '</ul>';
   }
 
-  function open(app, exercise) {
+  /** Vidéos d'un exercice (title : titre de la feuille, sinon le nom de l'exercice). */
+  function open(app, exercise, title) {
     app.openSheet({
-      title: exercise,
+      title: title || exercise,
       html: '<div class="vid-player" data-player hidden><video controls playsinline preload="metadata"></video></div>' +
         '<p class="muted small" data-vstatus hidden></p>' +
         '<label class="btn primary block photo-add" data-vadd>' + App.icon('video') + 'Filmer ou choisir une vidéo<input type="file" accept="video/*" data-vinput hidden></label>' +
@@ -3982,8 +4352,19 @@ Views.train = (function () {
       '<button class="btn ghost block" data-abort>Abandonner la séance</button>');
   }
 
+  /** Musculation ou calisthénie (gardé sur le téléphone). */
+  function mode() { return app.ls.get('trainMode', 'muscu') === 'cali' ? 'cali' : 'muscu'; }
+  function modeSeg(m) {
+    return '<div class="seg train-mode"><button data-tmode="muscu" aria-pressed="' + (m === 'muscu') + '">Musculation</button>' +
+      '<button data-tmode="cali" aria-pressed="' + (m === 'cali') + '">Calisthénie</button></div>';
+  }
+
   function render(st, a) {
     app = a; state = st;
+    if (mode() === 'cali') return modeSeg('cali') + Views.cali.render(st, a);
+    return modeSeg('muscu') + renderMuscu();
+  }
+  function renderMuscu() {
     var w = workout(), name = picked();
     if (!name) return '<section class="card"><h2>Aucun programme</h2><p class="muted">Importe le sheet du coach (menu Grind → Importer) pour retrouver tes séances ici.</p></section>';
     return w ? renderWorkout(w) : pickerCard(name) + renderWorkout(preview(name));
@@ -3993,10 +4374,11 @@ Views.train = (function () {
   function header(st, a) {
     app = a; state = st;
     var w = workout(), right = HIST_BTN.replace('%ICON%', App.icon('list'));
+    if (mode() === 'cali') return Views.head('Calisthénie', U.longDate(U.today()), right);
     if (!w) return Views.head('Séance', U.longDate(U.today()), right);
     return Views.head(U.esc(w.session), '<span data-head-sub>' + headSub(w) + '</span>', right);
   }
-  function headAction(name) { if (name === 'history') openHistory(); }
+  function headAction(name) { if (name === 'history') { if (mode() === 'cali') Views.cali.history(); else openHistory(); } }
   function headSub(w) {
     var min = Math.round((Date.now() - w.startedAt) / 60000);
     var done = sets().filter(function (s) { return s.sessionId === w.sessionId; }).length;
@@ -4159,6 +4541,14 @@ Views.train = (function () {
   function bind(root, st, a) {
     app = a; state = st;
     root.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-tmode]');
+      if (!t || t.getAttribute('aria-pressed') === 'true') return;
+      app.ls.set('trainMode', t.getAttribute('data-tmode'));
+      app.render({ dir: t.getAttribute('data-tmode') === 'cali' ? 'r' : 'l' });
+      app.scrollTo(0);
+    });
+    if (mode() === 'cali') return Views.cali.bind(root, st, a);
+    root.addEventListener('click', function (e) {
       var b;
       if ((b = e.target.closest('[data-start]'))) return start(b.getAttribute('data-start'));
       if ((b = e.target.closest('[data-check]'))) return validate(root, b.getAttribute('data-check'));
@@ -4210,6 +4600,280 @@ Views.train = (function () {
 })();
 
 window.Views = Views;
+</script>
+
+  <script>
+/*
+ * Séance › Calisthénie : figures suivies à part de la musculation (onglet CALI, une ligne par série).
+ * - En haut, les quatre figures avec leur palier en cours ; toucher une figure l'affiche en dessous.
+ * - Palier travaillé au choix (silhouettes), séries en secondes tenues (chrono intégré) ou en répétitions (muscle-up).
+ * - Conseil : + 1 s (ou + 1 rep) sur la meilleure série, palier suivant proposé une fois l'objectif tenu.
+ * - Vidéos d'exécution par figure (comme en musculation), progression par palier et parcours des paliers.
+ * - Saisies pas encore validées gardées sur le téléphone (verrouillage), comme en musculation.
+ */
+Views.cali = (function () {
+  var app, state;
+  var COUNTDOWN = 5; // secondes pour se mettre en place avant que le chrono parte
+
+  function logs() { return Store.list('CALI'); }
+  function picked() { return app.ls.get('caliPick', {}) || {}; }
+  function skillNow() { var id = app.ls.get('caliSkill', null); return Cali.skill(id) || Cali.SKILLS[0]; }
+  function levelNow(sk) { return Cali.current(logs(), sk, picked()[sk.id]); }
+  function extra(sk, lv) { return (app.ls.get('caliExtra', {}) || {})[sk.id + '|' + lv] || 0; }
+  function rowId(sk, lv, n) { return 'c-' + U.today() + '-' + sk.id + '-' + lv + '-' + n; }
+  function many(sk) { return sk.levels.length > 1; }
+  /** « 9 s », « 5 reps ». */
+  function fmt(sk, v) { return v == null ? '–' : U.nf(v, 0) + (sk.kind === 'reps' ? ' rep' + (v > 1 ? 's' : '') : ' s'); }
+  function fmtList(sk, sets) {
+    return sets.map(function (r) { return U.nf(Cali.valOf(sk, r), 0) + (sk.kind === 'reps' ? '' : ' s'); }).join(' · ') + (sk.kind === 'reps' ? ' reps' : '');
+  }
+  /** Vidéos rangées à part des exercices de musculation (une « Planche » de gainage n'est pas la planche). */
+  function videoKey(sk) { return 'Calisthénie · ' + sk.name; }
+  /** Saisies tapées mais pas validées, pour aujourd'hui seulement. */
+  function drafts() { var d = app.ls.get('caliDraft', null); return d && d.date === U.today() ? d.rows || {} : {}; }
+  function setDraft(k, v) {
+    var rows = drafts();
+    if (v) rows[k] = v; else delete rows[k];
+    app.ls.set('caliDraft', { date: U.today(), rows: rows });
+  }
+
+  // ---------------------------------------------------------------- figures (vue d'ensemble)
+
+  function tiles(cur) {
+    return '<div class="cali-tiles">' + Cali.SKILLS.map(function (sk) {
+      var lv = levelNow(sk), i = Cali.levelIdx(sk, lv), b = Cali.best(logs(), sk, lv);
+      return '<button class="tile cali-tile' + (sk.id === cur.id ? ' on' : '') + '" data-skill="' + sk.id + '">' +
+        '<span class="ct-fig">' + Cali.picto(sk.id, lv) + '</span>' +
+        '<span class="ct-name">' + U.esc(sk.name) + '</span>' +
+        '<span class="ct-level">' + (many(sk) ? U.esc(Cali.level(sk, lv).name) : 'Répétitions') + '</span>' +
+        (many(sk) ? '<span class="ct-dots" aria-label="Palier ' + (i + 1) + ' sur ' + sk.levels.length + '">' + sk.levels.map(function (l, k) { return '<i class="' + (k < i ? 'done' : k === i ? 'now' : '') + '"></i>'; }).join('') + '</span>' : '<span class="ct-dots"></span>') +
+        '<span class="tile-note">' + (b == null ? 'Pas encore de série' : 'Record ' + fmt(sk, b)) + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  // ---------------------------------------------------------------- figure du jour
+
+  function levelRow(sk, lv) {
+    var ci = Cali.levelIdx(sk, lv);
+    return '<div class="lv-row" data-lv-row>' + sk.levels.map(function (l, i) {
+      var b = Cali.best(logs(), sk, l.id), st = i < ci ? 'done' : i === ci ? 'now' : 'next';
+      return '<button class="lv ' + st + (l.id === lv ? ' on' : '') + '" data-level="' + l.id + '" aria-pressed="' + (l.id === lv) + '">' +
+        Cali.picto(sk.id, l.id) + '<span class="lv-name">' + U.esc(l.name) + '</span>' +
+        '<small>' + (st === 'done' ? App.icon('check', 'xs') + (b == null ? 'Passé' : fmt(sk, b)) : b == null ? (st === 'now' ? 'En cours' : 'À venir') : 'Record ' + fmt(sk, b)) + '</small></button>';
+    }).join('') + '</div>';
+  }
+
+  function skillCard(sk) {
+    var lv = levelNow(sk), today = U.today();
+    var prev = Cali.last(logs(), sk, lv, today), sug = Cali.suggest(logs(), sk, lv, today), best = Cali.best(logs(), sk, lv);
+    var n = Math.max(Cali.GOAL_SETS + extra(sk, lv), 1), rows = '', draft = drafts(), unit = sk.kind === 'reps' ? 'reps' : 's';
+    for (var i = 1; i <= n; i++) {
+      var saved = Store.get('CALI', rowId(sk, lv, i)), v = saved ? Cali.valOf(sk, saved) : null;
+      var ps = prev && prev.sets[i - 1], ph = i === 1 && sug.aim ? sug.aim : ps ? Cali.valOf(sk, ps) : null;
+      var dv = !saved && draft[sk.id + '|' + lv + '|' + i] || '';
+      rows += '<div class="set-row cali-row' + (sk.kind === 'reps' ? ' solo' : '') + (saved ? ' done' : '') + '" data-crow="' + i + '">' +
+        '<span class="set-n">' + i + '</span>' +
+        '<span class="field-box"><input inputmode="numeric" data-val placeholder="' + (ph == null ? unit : ph) + '" value="' + (v == null ? U.esc(dv) : v) + '"><span class="unit">' + unit + '</span></span>' +
+        (sk.kind === 'reps' ? '' : '<button class="btn soft chrono-btn" data-chrono="' + i + '">' + App.icon('stopwatch', 'sm') + 'Chrono</button>') +
+        '<button class="check" data-ccheck="' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
+    }
+    var vids = Videos.of(videoKey(sk)).length;
+    return '<section class="card cali-card">' +
+      '<div class="cali-top"><div class="start-text">' +
+      '<span class="tile-label">' + (sk.kind === 'reps' ? 'Répétitions' : 'Statique · durée tenue') + '</span>' +
+      '<h2>' + U.esc(sk.name) + '</h2>' +
+      '<p class="muted small">' + sk.muscles.map(U.esc).join(' · ') + '</p>' +
+      '<button class="ex-video" data-cvideo>' + App.icon('video', 'sm') + (vids ? 'Mes vidéos (' + vids + ')' : 'Ajouter une vidéo') + '</button></div>' +
+      '<div class="ex-fig">' + Body.mini(sk.muscles) + '</div></div>' +
+      (many(sk) ? '<div class="field-label cali-sub">Palier · ' + (Cali.levelIdx(sk, lv) + 1) + ' sur ' + sk.levels.length + '</div>' + levelRow(sk, lv) : '<div class="cali-sub"></div>') +
+      (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + fmtList(sk, prev.sets) + (best != null ? ' · record ' + fmt(sk, best) : '') + '</p>' : '<p class="muted small">' + (many(sk) ? 'Premières séries sur ce palier.' : 'Premières séries.') + '</p>') +
+      '<p class="tip">' + U.esc(sug.text) + '</p>' +
+      (sug.next ? '<button class="btn soft sm next-lv" data-level="' + sug.next + '">Passer en ' + U.esc(Cali.level(sk, sug.next).name.toLowerCase()) + '</button>' : '') +
+      '<div class="sets">' + rows + '</div>' +
+      '<div class="set-actions">' + (n > 1 ? '<button class="btn ghost" data-cless>− Série</button>' : '') + '<button class="btn ghost" data-cmore>+ Série</button></div>' +
+      '</section>';
+  }
+
+  // ---------------------------------------------------------------- progression et parcours
+
+  function progressCard(sk) {
+    var lv = levelNow(sk), worked = sk.levels.filter(function (l) { return Cali.progress(logs(), sk, l.id).length; });
+    var show = state.caliProg && worked.some(function (l) { return l.id === state.caliProg; }) ? state.caliProg : lv;
+    var p = Cali.progress(logs(), sk, show), unit = sk.kind === 'reps' ? 'reps' : 's';
+    var stats = '';
+    if (p.length) {
+      var best = Math.max.apply(null, p.map(function (d) { return d.best; })), lastD = p[p.length - 1];
+      stats = '<div class="stats three">' +
+        '<div class="stat"><span class="tile-label">Record</span><b>' + U.nf(best, 0) + ' ' + unit + '</b></div>' +
+        '<div class="stat"><span class="tile-label">Dernière</span><b>' + U.nf(lastD.best, 0) + ' ' + unit + '</b></div>' +
+        '<div class="stat"><span class="tile-label">Séances</span><b>' + p.length + '</b></div></div>';
+    }
+    var chart = Views.trends.lineChart(p.map(function (d) { return { date: d.date, v: d.best }; }), {
+      unit: unit, dec: 0, name: sk.kind === 'reps' ? 'Meilleure série' : 'Meilleure tenue', label: sk.name + (many(sk) ? ' ' + Cali.level(sk, show).name : ''),
+      detail: function (pt) { var d = p.filter(function (x) { return x.date === pt.date; })[0]; return d ? [d.sets.length + ' séries : ' + fmtList(sk, d.sets)] : []; }
+    });
+    var parcours = '';
+    if (many(sk)) {
+      var path = Cali.path(logs(), sk, lv);
+      parcours = '<div class="field-label cali-sub">Parcours</div><ol class="cali-path">' + path.map(function (s, i) {
+        var nx = path[i + 1], goal = Cali.GOAL_SETS + ' × ' + Cali.goalOf(sk, s.level.id) + ' ' + unit;
+        var note = s.state === 'done' ? (s.first ? U.shortDate(s.first) + ' → ' + (nx && nx.first ? U.shortDate(nx.first) : '') : 'Passé') + (s.best != null ? ' · record ' + fmt(sk, s.best) : '') :
+          s.state === 'now' ? (s.first ? 'Depuis le ' + U.shortDate(s.first) + ' · ' : '') + (s.metOn ? 'objectif tenu le ' + U.shortDate(s.metOn) : 'objectif ' + goal) :
+          'Objectif ' + goal;
+        return '<li class="cp-' + s.state + '"><i class="cp-dot">' + (s.state === 'done' ? App.icon('check', 'xs') : '') + '</i>' +
+          '<span class="cp-fig">' + Cali.picto(sk.id, s.level.id) + '</span>' +
+          '<span class="cp-text"><b>' + U.esc(s.level.name) + '</b><span class="muted small">' + note + '</span></span></li>';
+      }).join('') + '</ol>';
+    }
+    return '<section class="card"><div class="card-head"><h2>Progression</h2><span class="muted small">' + U.esc(sk.name) + '</span></div>' +
+      (worked.length > 1 ? '<div class="seg prog-seg">' + worked.map(function (l) { return '<button data-cprog="' + l.id + '" aria-pressed="' + (l.id === show) + '">' + U.esc(l.name) + '</button>'; }).join('') + '</div>' : '') +
+      stats + chart + parcours + '</section>';
+  }
+
+  function render(st, a) {
+    app = a; state = st;
+    var sk = skillNow();
+    return tiles(sk) + skillCard(sk) + progressCard(sk);
+  }
+
+  // ---------------------------------------------------------------- historique (feuille du bouton liste)
+
+  function history() {
+    var days = {};
+    logs().forEach(function (r) {
+      var sk = Cali.skill(r.skill);
+      if (!sk || Cali.valOf(sk, r) === null) return;
+      var d = days[r.date] = days[r.date] || {}, k = r.skill + '|' + r.level;
+      (d[k] = d[k] || []).push(r);
+    });
+    var dates = Object.keys(days).sort().reverse().slice(0, 40);
+    app.openSheet({
+      title: 'Historique',
+      html: dates.length ? '<ul class="list">' + dates.map(function (date) {
+        return '<li class="hist-row"><span class="entry-name">' + U.dayLetter(date) + ' ' + U.shortDate(date) + '</span>' +
+          Object.keys(days[date]).map(function (k) {
+            var parts = k.split('|'), sk = Cali.skill(parts[0]), l = Cali.level(sk, parts[1]);
+            var sets = days[date][k].sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); });
+            return '<span class="muted small">' + U.esc(sk.name + (many(sk) && l ? ' ' + l.name.toLowerCase() : '')) + ' : ' + fmtList(sk, sets) + '</span>';
+          }).join('') + '</li>';
+      }).join('') + '</ul>' : '<p class="muted">Pas encore de série de calisthénie.</p>'
+    });
+  }
+
+  // ---------------------------------------------------------------- chrono (feuille)
+
+  var RING = 2 * Math.PI * 92;
+  function openChrono(root, n) {
+    var sk = skillNow(), lv = levelNow(sk), g = Cali.goalOf(sk, lv), best = Cali.best(logs(), sk, lv);
+    var t0 = null, raf = null, stopped = false, buzzed = {};
+    var mark = best != null && g && best < g ? '<circle class="rec-mark" cx="' + (100 + 92 * Math.cos(2 * Math.PI * best / g)).toFixed(1) + '" cy="' + (100 + 92 * Math.sin(2 * Math.PI * best / g)).toFixed(1) + '" r="4"/>' : '';
+    app.openSheet({
+      title: sk.name + (many(sk) ? ' · ' + Cali.level(sk, lv).name : ''),
+      html: '<div class="chrono" data-chrono-box><div class="chrono-dial">' +
+        '<svg viewBox="0 0 200 200" aria-hidden="true"><circle class="track" cx="100" cy="100" r="92"/><circle class="val" cx="100" cy="100" r="92" stroke-dasharray="' + RING.toFixed(1) + '" stroke-dashoffset="' + RING.toFixed(1) + '" data-cring/>' + mark + '</svg>' +
+        '<div class="chrono-read"><div class="chrono-t" data-ct>' + COUNTDOWN + '</div><div class="chrono-sub" data-cs>Mets-toi en place</div></div></div>' +
+        '<div class="chrono-marks">' + (g ? '<span>Objectif <b>' + g + ' s</b></span>' : '') + (best != null ? '<span>Record <b>' + best + ' s</b></span>' : '') + '<span>Série <b>' + n + '</b></span></div>' +
+        '<button class="btn primary block chrono-stop" data-cstop>Arrêter</button>' +
+        '<p class="muted small center">Le temps tenu est noté et la série validée.</p></div>',
+      bind: function (sh) {
+        var tEl = sh.querySelector('[data-ct]'), sEl = sh.querySelector('[data-cs]'), ring = sh.querySelector('[data-cring]'), box = sh.querySelector('[data-chrono-box]');
+        var start = Date.now() + COUNTDOWN * 1000, full = g || best || 30;
+        function frame() {
+          if (stopped || !document.body.contains(sh)) return;
+          var now = Date.now();
+          if (now < start) {
+            var c = String(Math.ceil((start - now) / 1000));
+            if (tEl.textContent !== c) { tEl.textContent = c; app.haptic(8); }
+          } else {
+            if (!t0) { t0 = start; app.haptic(40); box.classList.add('run'); }
+            var s = (now - t0) / 1000;
+            tEl.innerHTML = Math.floor(s) + '<small>,' + Math.floor((s % 1) * 10) + '</small>';
+            sEl.textContent = g ? (s >= g ? 'Objectif tenu' : 'Encore ' + Math.ceil(g - s) + ' s') : 'Tiens bon';
+            ring.setAttribute('stroke-dashoffset', (RING * (1 - Math.min(1, s / full))).toFixed(1));
+            if (g && s >= g && !buzzed.g) { buzzed.g = 1; box.classList.add('goal'); app.haptic([80, 60, 80]); }
+            if (best != null && s > best && !buzzed.b) { buzzed.b = 1; box.classList.add('rec'); }
+          }
+          raf = requestAnimationFrame(frame);
+        }
+        frame();
+        sh.querySelector('[data-cstop]').addEventListener('click', function () {
+          stopped = true; cancelAnimationFrame(raf);
+          var sec = t0 ? Math.floor((Date.now() - t0) / 1000) : 0;
+          app.closeSheet();
+          if (sec <= 0) return;
+          var row = root.querySelector('[data-crow="' + n + '"]');
+          if (row) { row.querySelector('[data-val]').value = sec; validate(root, n); }
+        });
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------- actions
+
+  function validate(root, n) {
+    var sk = skillNow(), lv = levelNow(sk), id = rowId(sk, lv, n);
+    var row = root.querySelector('[data-crow="' + n + '"]'), el = row.querySelector('[data-val]');
+    var v = U.parseNum(el.value || el.placeholder);
+    if (v === null || v <= 0) { app.toast(sk.kind === 'reps' ? 'Indique le nombre de répétitions' : 'Indique le temps tenu'); el.focus(); return; }
+    v = Math.round(v);
+    var was = Store.get('CALI', id);
+    setDraft(sk.id + '|' + lv + '|' + n, null);
+    if (was && Cali.valOf(sk, was) === v) { // déjà validée, rien de changé : on la dévalide
+      Store.remove('CALI', id); el.value = ''; row.classList.remove('done', 'just'); app.stopTimer(); app.haptic(10); return;
+    }
+    var before = Cali.best(logs(), sk, lv, id);
+    var rec = { id: id, date: U.today(), skill: sk.id, level: lv, setNo: n, sec: null, reps: null };
+    rec[sk.kind === 'reps' ? 'reps' : 'sec'] = v;
+    Store.put('CALI', rec);
+    var p = picked(); if (p[sk.id]) { delete p[sk.id]; app.ls.set('caliPick', p); } // le palier en cours devient celui de la série
+    el.value = v;
+    row.classList.remove('just'); void row.offsetWidth; row.classList.add('done', 'just');
+    if (before !== null && v > before) app.toast('Record' + (many(sk) ? ' en ' + Cali.level(sk, lv).name.toLowerCase() : '') + ' : ' + fmt(sk, v));
+    app.haptic(15);
+    app.startTimer(sk.kind === 'reps' ? 180 : 120, sk.name);
+  }
+
+  function rerender() { var y = app.scrollY(); app.render(); app.scrollTo(y); }
+
+  function bind(root, st, a) {
+    app = a; state = st;
+    root.addEventListener('click', function (e) {
+      var b, sk = skillNow();
+      if ((b = e.target.closest('[data-skill]'))) { app.ls.set('caliSkill', b.getAttribute('data-skill')); state.caliProg = null; rerender(); return; }
+      if ((b = e.target.closest('[data-level]'))) {
+        var p = picked(); p[sk.id] = b.getAttribute('data-level'); app.ls.set('caliPick', p); state.caliProg = null; rerender(); return;
+      }
+      if (e.target.closest('[data-cvideo]')) return Videos.open(app, videoKey(sk), sk.name);
+      if ((b = e.target.closest('[data-chrono]'))) return openChrono(root, Number(b.getAttribute('data-chrono')));
+      if ((b = e.target.closest('[data-ccheck]'))) return validate(root, Number(b.getAttribute('data-ccheck')));
+      if ((b = e.target.closest('[data-cprog]'))) { state.caliProg = b.getAttribute('data-cprog'); rerender(); return; }
+      if (e.target.closest('[data-cmore]') || e.target.closest('[data-cless]')) {
+        var lv = levelNow(sk), all = app.ls.get('caliExtra', {}) || {}, k = sk.id + '|' + lv, d = e.target.closest('[data-cmore]') ? 1 : -1;
+        if (d < 0) { var gone = Store.get('CALI', rowId(sk, lv, Cali.GOAL_SETS + (all[k] || 0))); if (gone) Store.remove('CALI', gone.id); }
+        all[k] = (all[k] || 0) + d; if (!all[k]) delete all[k];
+        app.ls.set('caliExtra', all); rerender();
+      }
+    });
+    root.addEventListener('input', function (e) {
+      var row = e.target.closest('[data-crow]');
+      if (!row) return;
+      var sk = skillNow();
+      setDraft(sk.id + '|' + levelNow(sk) + '|' + row.getAttribute('data-crow'), e.target.value);
+    });
+    root.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var row = e.target.closest('[data-crow]');
+      if (row) { e.preventDefault(); validate(root, Number(row.getAttribute('data-crow'))); }
+    });
+    // Palier en cours au milieu de la rangée (après le rendu : mesure).
+    requestAnimationFrame(function () {
+      var r = root.querySelector('[data-lv-row]'), on = r && r.querySelector('.lv.on');
+      if (on) r.scrollLeft = on.offsetLeft - (r.clientWidth - on.offsetWidth) / 2;
+    });
+  }
+
+  return { render: render, bind: bind, history: history };
+})();
 </script>
 
   <script>
@@ -6482,6 +7146,7 @@ window.Views = Views;
     flag: '<path d="M5.5 20.5v-16M5.5 5h11l-2 4 2 4h-11"/>',
     video: '<rect x="3.5" y="6.5" width="12" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3"/>',
     play: '<path d="M8 5.5v13l10.5-6.5L8 5.5Z"/>',
+    stopwatch: '<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 3.5h4M17.5 7.5l1.5-1.5"/>',
     trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>',
     flame: '<path d="M12 21c-3.6 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.7 2.3 3.3.2-2.9 1.6-5.5 3.6-7 .2 2.6 1.4 4.3 2.6 6 .8 1.2 1.4 2.5 1.4 4.3 0 4-2.9 7.2-7 7.2Z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.4-2.6 2.1-4 .9.9 2.1 1.8 2.9 3 .3.4.5.9.5 1.4 0 1.3-1.2 2.4-2.7 2.4Z"/>'
   };
