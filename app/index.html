@@ -1217,6 +1217,57 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .cp-text b { font: 600 14.5px/1.25 var(--font); }
 .cp-text .muted.small { font-size: 12.5px; line-height: 1.35; }
 
+/* calisthénie : analyse en direct (caméra plein écran, squelette, critères notés) */
+.pose-launch { margin: 2px 0 10px; }
+.pose-live { position: fixed; inset: 0; z-index: 900; background: #000; color: #fff; overflow: hidden; touch-action: manipulation;
+  /* toujours sombre (image de la caméra derrière), quel que soit le thème */
+  --text: #fff; --text-2: rgba(255, 255, 255, .7); --text-3: rgba(255, 255, 255, .48);
+  --field: rgba(255, 255, 255, .1); --field-shadow: none; --thumb: rgba(255, 255, 255, .22); --thumb-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .25);
+  --pos: #8BE3A8; --neg: #FF9C92; --warn: #F0CC7A; }
+html.pose-open { overflow: hidden; }
+html.pose-open #lq { display: none; }
+.pose-live video { position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.pose-cv { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pose-top { position: absolute; top: calc(var(--sat) + 8px); left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pose-btn { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, .5); color: #fff; }
+.pose-btn .icon { width: 22px; height: 22px; }
+.pose-title { display: grid; justify-items: center; text-align: center; text-shadow: 0 1px 6px rgba(0, 0, 0, .7); }
+.pose-title b { font: 700 19px/1.2 var(--font); }
+.pose-title span { font-size: 13px; color: rgba(255, 255, 255, .75); }
+.pose-lab { font: 600 11px/1 var(--font); letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .62); }
+.pose-clock { position: absolute; top: calc(var(--sat) + 62px); left: 0; right: 0; display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.pose-t { font: 700 52px/1 var(--font); letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--accent); text-shadow: 0 2px 14px rgba(0, 0, 0, .6); }
+.pose-live.holding .pose-t { color: var(--pos); }
+.pose-status { max-width: 86%; padding: 6px 12px; border-radius: 999px; background: rgba(0, 0, 0, .55); font-size: 13.5px; line-height: 1.3; text-align: center; }
+.pose-status:empty { display: none; }
+.pose-panel { position: absolute; left: 12px; right: 12px; bottom: calc(var(--sab) + 12px); max-width: 480px; margin: 0 auto; padding: 14px 14px 12px; border-radius: var(--r-lg); background: rgba(12, 13, 18, .78); box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .14); display: grid; gap: 9px; }
+.pose-score { display: flex; align-items: baseline; justify-content: space-between; }
+.pose-score b { font: 700 28px/1 var(--font); font-variant-numeric: tabular-nums; }
+.pose-score b small { font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, .55); }
+.pose-score b.pos { color: var(--pos); } .pose-score b.warn { color: var(--warn); } .pose-score b.neg { color: var(--neg); }
+.pose-bars { display: grid; gap: 7px; }
+.pose-bar { display: grid; grid-template-columns: minmax(96px, 38%) 1fr 34px; align-items: center; gap: 10px; font-size: 13.5px; }
+.pose-bar span { color: rgba(255, 255, 255, .82); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pose-bar i { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.pose-bar b { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width .2s linear; }
+.pose-bar.pos b { background: var(--pos); } .pose-bar.warn b { background: var(--warn); } .pose-bar.neg b { background: var(--neg); }
+.pose-bar.pos em { color: var(--pos); } .pose-bar.warn em { color: var(--warn); } .pose-bar.neg em { color: var(--neg); }
+.pose-bar em { font-style: normal; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pose-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pose-seg { width: 168px; }
+.pose-seg button { height: 32px; font-size: 13px; }
+.pose-fps { font-size: 11.5px; color: rgba(255, 255, 255, .5); text-align: right; }
+.pose-done { height: 50px; }
+/* téléphone couché : les notes passent à droite, l'image garde la hauteur */
+@media (orientation: landscape) and (max-height: 520px) {
+  .pose-clock { top: calc(var(--sat) + 8px); left: 72px; right: auto; justify-items: start; }
+  .pose-top { left: max(12px, env(safe-area-inset-left, 0px)); right: auto; flex-direction: column; align-items: flex-start; }
+  .pose-title { display: none; }
+  .pose-t { font-size: 40px; }
+  .pose-status { max-width: 46vw; }
+  .pose-panel { left: auto; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(var(--sat) + 10px); bottom: calc(var(--sab) + 10px); width: 300px; margin: 0; align-content: start; overflow-y: auto; }
+}
+
 /* séance : tête d'exercice */
 .ex-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
 .ex-fig { flex: none; width: 52px; height: 92px; padding: 2px 0; border-radius: 14px; background: var(--card-2); display: grid; place-items: center; }
@@ -1434,7 +1485,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-12 02:43 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-12 03:17 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3493,6 +3544,233 @@ var Cali = (function () {
 
   <script>
 /*
+ * Analyse de la forme d'une figure statique (calculs purs, testés dans test/form.test.js).
+ *
+ * Entrée : les 33 points du corps rendus par MediaPipe Pose pour une image ({ x, y, visibility },
+ * x et y entre 0 et 1), et la taille de l'image en pixels (les angles se mesurent en pixels).
+ * On garde le côté le mieux vu (téléphone posé de profil), on mesure des angles, et chaque critère
+ * devient une note de 0 à 10. La note de l'image = moyenne des critères mesurés.
+ *
+ * Version d'essai : mêmes critères que les apps de calisthénie (protraction, rétroversion, alignement,
+ * jambes tendues). Les omoplates et le bassin ne sont pas des points du modèle : « Protraction » et
+ * « Rétroversion » sont des approximations (bras verrouillés et épaules devant les mains ; hanches ni
+ * cassées ni creusées). Les seuils sont à régler sur de vraies vidéos de profil.
+ *
+ * Form.tracker() suit le temps tenu : le chrono part quand la figure est reconnue 0,3 s d'affilée et
+ * s'arrête quand elle est perdue plus de 0,6 s ; la note d'une tenue = moyenne des images pendant la tenue.
+ */
+var Form = (function () {
+  var SIDES = {
+    L: { s: 11, e: 13, w: 15, h: 23, k: 25, a: 27 },
+    R: { s: 12, e: 14, w: 16, h: 24, k: 26, a: 28 }
+  };
+  var VIS = 0.5; // point jugé visible au-delà
+  var START_MS = 300, LOSE_MS = 600, CLEAN = 7;
+
+  // ---------------------------------------------------------------- géométrie (pixels, y vers le bas)
+
+  function P(p, W, H) { return p ? { x: p.x * W, y: p.y * H, v: p.visibility == null ? 1 : p.visibility } : null; }
+  function dist(a, b) { return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)); }
+  /** Angle en b (degrés) entre ba et bc. */
+  function angle(a, b, c) {
+    var ux = a.x - b.x, uy = a.y - b.y, vx = c.x - b.x, vy = c.y - b.y;
+    var d = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy);
+    if (!d) return null;
+    return Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / d))) * 180 / Math.PI;
+  }
+  /** Pente d'un segment par rapport à l'horizontale, 0 à 90°. */
+  function tilt(a, b) { return Math.atan2(Math.abs(b.y - a.y), Math.abs(b.x - a.x)) * 180 / Math.PI; }
+  /** 10 au niveau « good », 0 au niveau « bad », linéaire entre les deux (good < bad ou l'inverse). */
+  function lin(v, good, bad) {
+    if (v == null || !isFinite(v)) return null;
+    var t = (v - bad) / (good - bad);
+    return Math.round(100 * Math.max(0, Math.min(1, t))) / 10;
+  }
+  function min2(a, b) { return a == null ? b : b == null ? a : Math.min(a, b); }
+  function inFrame(p) { return p && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1; }
+
+  /** Côté le mieux vu : celui dont les six articulations ont la meilleure visibilité. */
+  function side(pts) {
+    var best = 'L', bv = -1;
+    ['L', 'R'].forEach(function (k) {
+      var ix = SIDES[k], v = 0;
+      for (var n in ix) v += (pts[ix[n]] && pts[ix[n]].visibility) || 0;
+      if (v > bv) { bv = v; best = k; }
+    });
+    return best;
+  }
+
+  /** Mesures d'une image : angles et positions utiles, null si épaule, hanche ou poignet manquent. */
+  function measure(pts, W, H) {
+    if (!pts || pts.length < 29) return null;
+    var k = side(pts), ix = SIDES[k], o = k === 'L' ? SIDES.R : SIDES.L;
+    var raw = {}, j = {};
+    for (var n in ix) { raw[n] = pts[ix[n]]; j[n] = P(pts[ix[n]], W, H); }
+    if (j.s.v < VIS || j.h.v < VIS || j.w.v < VIS) return null;
+    var legsSeen = j.k.v >= VIS && j.a.v >= VIS && inFrame(raw.a) && inFrame(raw.k);
+    var arm = dist(j.s, j.e) + dist(j.e, j.w);
+    var trunk = dist(j.s, j.h);
+    // sens de la tête : les épaules sont du côté opposé aux hanches
+    var dir = j.s.x >= j.h.x ? 1 : -1;
+    // jambe la plus tendue des deux (palier « une jambe » : l'autre est pliée exprès)
+    var ok = P(pts[o.k], W, H), oa = P(pts[o.a], W, H), oh = P(pts[o.h], W, H);
+    var knee = legsSeen ? angle(j.h, j.k, j.a) : null;
+    var kneeBest = knee;
+    if (legsSeen && ok && oa && ok.v >= VIS && oa.v >= VIS) kneeBest = Math.max(knee, angle(oh, ok, oa) || 0);
+    return {
+      side: k, j: j, legsSeen: legsSeen, arm: arm, trunk: trunk, dir: dir,
+      elbow: angle(j.s, j.e, j.w),
+      hipFlex: legsSeen ? angle(j.s, j.h, j.k) : null,          // hanches cassées (pike) ou creusées
+      hipLine: legsSeen ? angle(j.s, j.h, j.a) : null,          // épaule-hanche-cheville : ligne du corps
+      knee: knee, kneeBest: kneeBest,
+      shoulderOpen: angle(j.h, j.s, j.w),                        // ouverture d'épaules (handstand)
+      tiltBody: legsSeen ? tilt(j.s, j.a) : null,               // épaules → chevilles par rapport à l'horizontale
+      tiltBack: tilt(j.s, j.h),                                  // dos (épaules → hanches)
+      lean: arm ? (j.s.x - j.w.x) * dir / arm : null,            // épaules devant les mains, en longueurs de bras
+      liftFeet: legsSeen && arm ? (j.w.y - j.a.y) / arm : null,  // pieds au-dessus des mains (> 0)
+      handsBelow: arm ? (j.w.y - j.s.y) / arm : null,            // mains sous les épaules (> 0)
+      hipsAbove: trunk ? (j.s.y - j.h.y) / trunk : null,         // hanches au-dessus des épaules (> 0, tête en bas)
+      // écart horizontal max épaule / hanche / cheville par rapport aux poignets, en part de la longueur du corps
+      stack: legsSeen ? Math.max(Math.abs(j.s.x - j.w.x), Math.abs(j.h.x - j.w.x), Math.abs(j.a.x - j.w.x)) / (dist(j.w, j.a) || 1) : null
+    };
+  }
+
+  // ---------------------------------------------------------------- critères
+
+  var TUCKS = { tuck: 1, 'adv-tuck': 1 };
+
+  /** Critères notés pour une figure et un palier : [{ id, name, v (0-10 ou null) }]. */
+  function criteria(skill, level, m) {
+    var tuck = !!TUCKS[level];
+    if (skill === 'planche') {
+      var leanGood = tuck ? 0.25 : level === 'lean' ? 0.45 : 0.4, leanBad = tuck ? 0.02 : 0.1;
+      var prot = { id: 'prot', name: 'Protraction', v: min2(lin(m.elbow, 165, 135), lin(m.lean, leanGood, leanBad)) };
+      if (tuck) return [prot, { id: 'back', name: 'Dos horizontal', v: lin(m.tiltBack, 10, 40) }, { id: 'arms', name: 'Bras tendus', v: lin(m.elbow, 165, 135) }];
+      return [prot,
+        { id: 'retro', name: 'Rétroversion', v: lin(m.hipFlex, 165, 125) },
+        { id: 'align', name: 'Alignement', v: level === 'lean' ? lin(m.hipLine, 168, 135) : min2(lin(m.hipLine, 168, 135), lin(m.tiltBody, 10, 35)) },
+        { id: 'legs', name: 'Jambes tendues', v: lin(m.knee, 165, 125) }];
+    }
+    if (skill === 'front') {
+      var arms = { id: 'arms', name: 'Bras tendus', v: lin(m.elbow, 165, 135) };
+      if (tuck) return [arms, { id: 'back', name: 'Dos horizontal', v: lin(m.tiltBack, 10, 40) }];
+      return [arms,
+        { id: 'retro', name: 'Rétroversion', v: lin(m.hipFlex, 165, 125) },
+        { id: 'align', name: 'Alignement', v: min2(lin(m.hipLine, 168, 135), lin(m.tiltBody, 10, 35)) },
+        { id: 'legs', name: 'Jambes tendues', v: lin(level === 'one-leg' ? m.kneeBest : m.knee, 165, 125) }];
+    }
+    if (skill === 'handstand') {
+      return [
+        { id: 'stack', name: 'Empilement', v: lin(m.stack, 0.04, 0.2) },
+        { id: 'open', name: 'Ouverture d\'épaules', v: lin(m.shoulderOpen, 168, 135) },
+        { id: 'align', name: 'Alignement', v: lin(m.hipLine, 172, 145) },
+        { id: 'legs', name: 'Jambes tendues', v: lin(m.knee, 165, 125) }];
+    }
+    return [];
+  }
+
+  /** La figure est-elle tenue sur cette image ? (déclenche le chrono) */
+  function recognized(skill, level, m) {
+    if (skill === 'planche') {
+      if (m.tiltBack > 40 || m.handsBelow < 0.3) return false;
+      if (level === 'lean') return m.tiltBody != null && m.tiltBody < 40;
+      return m.liftFeet != null && m.liftFeet > 0.15; // pieds décollés, au-dessus des mains
+    }
+    if (skill === 'front') return m.tiltBack < 40 && m.handsBelow < -0.4; // suspendu : mains au-dessus des épaules
+    if (skill === 'handstand') return m.handsBelow > 0.4 && m.hipsAbove > 0.4 && m.tiltBack > 50;
+    return false;
+  }
+
+  /**
+   * Analyse d'une image : { seen, inPose, side, crit, score, hint }.
+   * seen = assez de points pour juger ; hint = conseil de cadrage quand ça ne va pas.
+   */
+  function analyze(skill, level, pts, W, H) {
+    var m = measure(pts, W, H);
+    if (!m) return { seen: false, inPose: false, crit: [], score: null, hint: pts ? 'Mets tout ton corps dans l\'image, de profil' : 'Personne en vue' };
+    var crit = criteria(skill, level, m);
+    var vals = crit.map(function (c) { return c.v; }).filter(function (v) { return v != null; });
+    var score = vals.length ? Math.round(10 * vals.reduce(function (a, b) { return a + b; }, 0) / vals.length) / 10 : null;
+    return {
+      seen: true, inPose: recognized(skill, level, m), side: m.side, crit: crit, score: score, m: m,
+      hint: m.legsSeen ? '' : 'Pieds hors de l\'image : recule un peu'
+    };
+  }
+
+  // ---------------------------------------------------------------- suivi dans le temps
+
+  /**
+   * Suivi d'une séance d'analyse. push(res, tMs) à chaque image analysée ; state() pour l'affichage.
+   * holds = tenues terminées { sec, score, clean, crit: { id: moyenne } }.
+   */
+  function tracker() {
+    var cand = null, holding = false, t0 = 0, lastIn = 0, lastT = null;
+    var acc = null, bars = {}, holds = [], live = null;
+    function newAcc() { return { n: 0, sum: 0, clean: 0, crit: {}, critN: {} }; }
+    function close() {
+      var sec = (lastIn - t0) / 1000;
+      var crit = {};
+      for (var id in acc.crit) crit[id] = Math.round(10 * acc.crit[id] / acc.critN[id]) / 10;
+      holds.push({ sec: Math.round(sec * 10) / 10, score: acc.n ? Math.round(10 * acc.sum / acc.n) / 10 : null, clean: Math.round(acc.clean / 100) / 10, crit: crit });
+      holding = false; acc = null;
+    }
+    function push(res, t) {
+      var gap = lastT == null ? 0 : t - lastT, dt = Math.min(250, Math.max(0, gap));
+      lastT = t;
+      // trou entre deux images (téléphone ralenti, onglet en pause) : on ne compte pas ce qu'on n'a pas vu
+      if (gap > LOSE_MS) { cand = null; if (holding) close(); }
+      live = res;
+      // barres en direct : moyenne glissante, pour ne pas trembler avec les points
+      (res.crit || []).forEach(function (c) {
+        if (c.v == null) return;
+        bars[c.id] = bars[c.id] == null ? c.v : bars[c.id] + 0.3 * (c.v - bars[c.id]);
+      });
+      if (res.inPose) {
+        lastIn = t;
+        if (!holding) {
+          if (cand == null) cand = t;
+          if (t - cand >= START_MS) { holding = true; t0 = cand; acc = newAcc(); }
+        }
+        if (holding && res.score != null) {
+          acc.n++; acc.sum += res.score;
+          var allClean = res.crit.length > 0;
+          res.crit.forEach(function (c) {
+            if (c.v == null) { allClean = false; return; }
+            acc.crit[c.id] = (acc.crit[c.id] || 0) + c.v; acc.critN[c.id] = (acc.critN[c.id] || 0) + 1;
+            if (c.v < CLEAN) allClean = false;
+          });
+          if (allClean) acc.clean += dt;
+        }
+      } else {
+        cand = null;
+        if (holding && t - lastIn > LOSE_MS) close();
+      }
+    }
+    function state(t) {
+      var cur = holding ? { sec: Math.max(0, ((t == null ? lastIn : t) - t0) / 1000), score: acc.n ? acc.sum / acc.n : null } : null;
+      return { holding: holding, current: cur, holds: holds.slice(), bars: bars, live: live, best: best() };
+    }
+    /** Meilleure tenue : la plus longue (à égalité, la mieux notée). */
+    function best() {
+      return holds.reduce(function (b, h) { return !b || h.sec > b.sec || (h.sec === b.sec && (h.score || 0) > (b.score || 0)) ? h : b; }, null);
+    }
+    /** Termine la tenue en cours (bouton « Terminer »). */
+    function finish() { if (holding) close(); return best(); }
+    return { push: push, state: state, finish: finish };
+  }
+
+  /** Couleur d'une note : 'pos' (≥ 8), 'warn' (≥ 5), 'neg'. */
+  function tone(v) { return v == null ? '' : v >= 8 ? 'pos' : v >= 5 ? 'warn' : 'neg'; }
+
+  /** Segments à dessiner : paires d'indices MediaPipe (côté vu en premier). */
+  var BONES = [[11, 13], [13, 15], [12, 14], [14, 16], [11, 12], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28], [27, 31], [28, 32]];
+
+  return { SIDES: SIDES, BONES: BONES, measure: measure, criteria: criteria, recognized: recognized, analyze: analyze, tracker: tracker, tone: tone, lin: lin, angle: angle };
+})();
+</script>
+
+  <script>
+/*
  * Bilans (purs, testés) : résumé d'une semaine et estimation de la dépense réelle.
  *
  * Dépense estimée (méthode « adaptive TDEE », comme MacroFactor) : sur les 21 derniers jours,
@@ -4604,6 +4882,277 @@ window.Views = Views;
 
   <script>
 /*
+ * Analyse en direct d'une figure statique (Calisthénie › « Lancer l'analyse »), version d'essai.
+ *
+ * La caméra frontale filme (on voit l'écran pendant la figure), MediaPipe Pose repère 33 points du
+ * corps sur chaque image, directement sur le téléphone : rien n'est envoyé, aucun appel serveur.
+ * Form note la position ; le chrono part tout seul quand la figure est reconnue et s'arrête quand
+ * elle est perdue. « Terminer » rend la meilleure tenue { sec, score, clean } à l'écran Calisthénie.
+ *
+ * MediaPipe (moteur WebAssembly ~13 Mo + modèle 6 ou 9 Mo) n'est chargé qu'à la première analyse,
+ * puis reste en cache dans le navigateur. Script classique (`Vision` global), comme le lecteur de
+ * codes-barres : pas de module, le code de l'app reste en ES5.
+ */
+var Pose = (function () {
+  var VER = '1.1.1';
+  var CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + VER + '/';
+  var MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_';
+  var MODELS = { lite: MODEL + 'lite/float16/1/pose_landmarker_lite.task', full: MODEL + 'full/float16/1/pose_landmarker_full.task' };
+
+  var scripts = {};
+  function loadScript(url, global) {
+    if (window[global]) return Promise.resolve(window[global]);
+    if (scripts[url]) return scripts[url];
+    scripts[url] = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = url;
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.onload = function () { window[global] ? resolve(window[global]) : reject(new Error('script vide')); };
+      s.onerror = function () { scripts[url] = null; reject(new Error('script non chargé')); };
+      document.head.appendChild(s);
+    });
+    return scripts[url];
+  }
+
+  var files = null, engines = {};
+  /**
+   * Détecteur de pose prêt, créé une fois par modèle : { lm, delegate, toCpu() }.
+   * Carte graphique d'abord, sinon processeur ; toCpu() sert de repli si la carte graphique échoue à l'usage.
+   */
+  function engine(kind) {
+    if (engines[kind]) return engines[kind];
+    engines[kind] = loadScript(CDN + 'vision_bundle.js', 'Vision').then(function (V) {
+      if (!files) { files = V.FilesetResolver.forVisionTasks(CDN + 'wasm'); files.catch(function () { files = null; }); }
+      return files.then(function (fs) {
+        var make = function (delegate) {
+          return V.PoseLandmarker.createFromOptions(fs, {
+            baseOptions: { modelAssetPath: MODELS[kind], delegate: delegate }, runningMode: 'VIDEO', numPoses: 1,
+            minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5
+          }).then(function (lm) {
+            return { lm: lm, delegate: delegate, toCpu: function () {
+              try { lm.close(); } catch (x) { /* déjà fermé */ }
+              engines[kind] = make('CPU');
+              engines[kind].catch(function () { engines[kind] = null; });
+              return engines[kind];
+            } };
+          });
+        };
+        return make('GPU').catch(function () { return make('CPU'); });
+      });
+    });
+    engines[kind].catch(function () { engines[kind] = null; });
+    return engines[kind];
+  }
+
+  function nf1(v) { return v == null ? '–' : (Math.round(v * 10) / 10).toFixed(1).replace('.', ','); }
+  /** Secondes au dixième, toujours avec sa décimale (« 7,0 s ») pour que le chrono ne saute pas. */
+  function secs(v) { return (Math.floor((v || 0) * 10) / 10).toFixed(1).replace('.', ',') + ' s'; }
+
+  /**
+   * Ouvre l'analyse plein écran. o = { skill: { id, name }, level: { id, name } | null, onDone(best) }.
+   */
+  function open(app, o) {
+    var skill = o.skill, level = o.level, facing = 'user', kind = app.ls.get('poseModel', 'lite') === 'full' ? 'full' : 'lite';
+    var closed = false, stream = null, raf = 0, eng = null, lastVT = -1, lastRes = null, lastPts = null, wake = null;
+    var tr = Form.tracker(), frames = [], ink = {}, holdsSeen = 0, gpuFails = 0;
+
+    var root = document.createElement('div');
+    root.className = 'pose-live';
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-label', 'Analyse de ' + skill.name);
+    root.innerHTML = '<video playsinline muted data-pv></video><canvas class="pose-cv" data-pc></canvas>' +
+      '<div class="pose-top">' +
+      '<button class="pose-btn" data-px aria-label="Fermer l\'analyse">' + App.icon('x') + '</button>' +
+      '<div class="pose-title"><b>' + U.esc(skill.name) + '</b>' + (level ? '<span>' + U.esc(level.name) + '</span>' : '') + '</div>' +
+      '<button class="pose-btn" data-pflip aria-label="Changer de caméra">' + App.icon('flip') + '</button></div>' +
+      '<div class="pose-clock"><span class="pose-lab">Temps</span><div class="pose-t" data-pt>0,0 s</div><div class="pose-status" data-ps>Ouverture de la caméra…</div></div>' +
+      '<div class="pose-panel">' +
+      '<div class="pose-score"><span class="pose-lab">Score</span><b data-pscore>–<small>/10</small></b></div>' +
+      '<div class="pose-bars" data-pbars></div>' +
+      '<div class="pose-foot"><div class="seg sm pose-seg" data-pmodel><button data-kind="lite" aria-pressed="' + (kind === 'lite') + '">Rapide</button><button data-kind="full" aria-pressed="' + (kind === 'full') + '">Précis</button></div>' +
+      '<span class="pose-fps" data-pfps></span></div>' +
+      '<button class="btn primary block pose-done" data-pdone>Terminer</button></div>';
+    document.body.appendChild(root);
+    document.documentElement.classList.add('pose-open');
+
+    var video = root.querySelector('[data-pv]'), cv = root.querySelector('[data-pc]'), g = cv.getContext('2d');
+    var el = { t: root.querySelector('[data-pt]'), s: root.querySelector('[data-ps]'), score: root.querySelector('[data-pscore]'), bars: root.querySelector('[data-pbars]'), fps: root.querySelector('[data-pfps]') };
+    var css = getComputedStyle(document.documentElement);
+    var col = { accent: css.getPropertyValue('--accent').trim() || '#4D8DFF', pos: css.getPropertyValue('--pos').trim() || '#8BE3A8', warn: css.getPropertyValue('--warn').trim() || '#F0CC7A', neg: css.getPropertyValue('--neg').trim() || '#FF9C92' };
+
+    /** Texte d'un élément changé seulement s'il diffère (pas de réécriture du DOM à chaque image). */
+    function put(k, node, html) { if (ink[k] !== html) { ink[k] = html; node.innerHTML = html; } }
+    function say(t) { put('s', el.s, U.esc(t)); }
+
+    // ---------------------------------------------------------------- caméra
+
+    function camera() {
+      if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+      stream = null;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('Caméra indisponible ici : ouvre Grind depuis son adresse web.'); return; }
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }).then(function (s) {
+        if (closed) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+        stream = s;
+        video.srcObject = s;
+        return video.play().then(function () { if (!eng) say('Chargement de l\'analyse… (la première fois, environ 20 Mo)'); });
+      }).catch(function () { say('Caméra refusée ou indisponible : autorise la caméra pour Grind, puis relance.'); });
+    }
+
+    function load() {
+      var k = kind;
+      eng = null;
+      engine(k).then(function (e) { if (!closed && k === kind) { eng = e; say(''); } }, function () {
+        if (!closed && k === kind) say('Analyse non chargée (connexion ?) : réessaie avec le réseau.');
+      });
+    }
+
+    // ---------------------------------------------------------------- dessin
+
+    var W = 0, H = 0, dpr = 1;
+    function resize() {
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = root.clientWidth; H = root.clientHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    }
+
+    function draw() {
+      var vw = video.videoWidth, vh = video.videoHeight;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, W, H);
+      if (!vw || !vh) return;
+      // image entière visible (ce qui est analysé = ce qu'on voit), en miroir pour la caméra frontale
+      var sc = Math.min(W / vw, H / vh), dw = vw * sc, dh = vh * sc, dx = (W - dw) / 2, dy = (H - dh) / 2;
+      if (facing === 'user') { g.translate(W, 0); g.scale(-1, 1); }
+      g.drawImage(video, dx, dy, dw, dh);
+      var p = lastPts;
+      if (!p) return;
+      var X = function (i) { return dx + p[i].x * dw; }, Y = function (i) { return dy + p[i].y * dh; };
+      var near = lastRes && lastRes.side ? Form.SIDES[lastRes.side] : null, nearSet = {};
+      if (near) for (var n in near) nearSet[near[n]] = 1;
+      g.lineCap = 'round';
+      Form.BONES.forEach(function (b) {
+        if ((p[b[0]].visibility || 0) < 0.3 || (p[b[1]].visibility || 0) < 0.3) return;
+        var main = nearSet[b[0]] && nearSet[b[1]];
+        g.strokeStyle = main ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.35)';
+        g.lineWidth = main ? 4 : 2;
+        g.beginPath(); g.moveTo(X(b[0]), Y(b[0])); g.lineTo(X(b[1]), Y(b[1])); g.stroke();
+      });
+      [0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28].forEach(function (i) {
+        if ((p[i].visibility || 0) < 0.3) return;
+        var main = nearSet[i];
+        g.fillStyle = i === 0 ? col.neg : main ? col.accent : 'rgba(255,255,255,.6)';
+        g.beginPath(); g.arc(X(i), Y(i), main ? 6 : 4, 0, 2 * Math.PI); g.fill();
+        if (main) { g.lineWidth = 2; g.strokeStyle = '#fff'; g.stroke(); }
+      });
+    }
+
+    // ---------------------------------------------------------------- affichage des notes
+
+    function ui(now) {
+      var st = tr.state(now), live = st.live;
+      var crit = live && live.crit && live.crit.length ? live.crit : Form.criteria(skill.id, level && level.id, {});
+      var rows = crit.map(function (c) {
+        var v = st.bars[c.id];
+        v = v == null ? null : Math.round(v * 10) / 10;
+        return '<div class="pose-bar ' + Form.tone(v) + '"><span>' + U.esc(c.name) + '</span><i><b style="width:' + (v == null ? 0 : v * 10) + '%"></b></i><em>' + nf1(v) + '</em></div>';
+      }).join('');
+      put('bars', el.bars, rows);
+      var sec = st.current ? st.current.sec : st.holds.length ? st.holds[st.holds.length - 1].sec : 0;
+      put('t', el.t, secs(sec));
+      root.classList.toggle('holding', st.holding);
+      var shown = st.current && st.current.score != null ? st.current.score : st.holds.length ? st.holds[st.holds.length - 1].score : live && live.score;
+      shown = shown == null ? null : Math.round(shown * 10) / 10;
+      put('score', el.score, nf1(shown) + '<small>/10</small>');
+      var tn = Form.tone(shown);
+      if (ink.tone !== tn) { ink.tone = tn; el.score.className = tn; }
+      if (st.holds.length > holdsSeen) { holdsSeen = st.holds.length; app.haptic([60, 40, 60]); }
+      if (!eng || !video.videoWidth) return;
+      if (st.holding) say('Tiens bon');
+      else if (st.holds.length) { var h = st.holds[st.holds.length - 1]; say('Tenu ' + secs(h.sec) + ' · score ' + nf1(h.score) + ' : recommence ou termine'); }
+      else if (!live || !live.seen) say(live && live.hint ? live.hint : 'Pose le téléphone de profil, tout ton corps dans l\'image');
+      else if (live.hint) say(live.hint);
+      else say(live.inPose ? 'Figure reconnue' : 'Mets-toi en position : le chrono part tout seul');
+    }
+
+    // ---------------------------------------------------------------- boucle
+
+    function detect(now) {
+      var r;
+      try { r = eng.lm.detectForVideo(video, now); } catch (err) {
+        if (eng.delegate === 'GPU' && ++gpuFails > 2) {
+          var k = kind, e = eng;
+          eng = null;
+          e.toCpu().then(function (c) { if (!closed && k === kind) eng = c; }, function () { if (!closed) say('Analyse impossible sur ce téléphone.'); });
+        }
+        return;
+      }
+      lastPts = r && r.landmarks && r.landmarks[0] ? r.landmarks[0] : null;
+      lastRes = Form.analyze(skill.id, level && level.id, lastPts, video.videoWidth, video.videoHeight);
+      tr.push(lastRes, now);
+      frames.push(now);
+      while (frames.length && now - frames[0] > 1000) frames.shift();
+      put('fps', el.fps, frames.length + ' img/s · ' + (eng.delegate === 'GPU' ? 'carte graphique' : 'processeur'));
+    }
+
+    function loop() {
+      if (closed) return;
+      raf = requestAnimationFrame(loop);
+      var now = performance.now();
+      if (eng && video.readyState >= 2 && video.currentTime !== lastVT) { lastVT = video.currentTime; detect(now); }
+      draw();
+      ui(now);
+    }
+
+    // ---------------------------------------------------------------- fermeture
+
+    function close(keep) {
+      if (closed) return;
+      closed = true;
+      cancelAnimationFrame(raf);
+      if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+      if (wake) { try { wake.release(); } catch (e) { /* déjà relâché */ } }
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('keydown', onKey);
+      document.documentElement.classList.remove('pose-open');
+      if (root.parentNode) root.parentNode.removeChild(root);
+      if (keep && o.onDone) o.onDone(keep);
+    }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+
+    root.addEventListener('click', function (e) {
+      var b;
+      if (e.target.closest('[data-px]')) return close();
+      if (e.target.closest('[data-pdone]')) { var best = tr.finish(); return close(best && best.sec >= 1 ? best : null); }
+      if (e.target.closest('[data-pflip]')) { facing = facing === 'user' ? 'environment' : 'user'; camera(); return; }
+      if ((b = e.target.closest('[data-kind]'))) {
+        var k = b.getAttribute('data-kind');
+        if (k === kind) return;
+        kind = k; app.ls.set('poseModel', k);
+        root.querySelectorAll('[data-kind]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        say('Chargement du modèle ' + (k === 'full' ? 'précis' : 'rapide') + '…');
+        load();
+      }
+    });
+    window.addEventListener('resize', resize);
+    document.addEventListener('keydown', onKey);
+    // écran gardé allumé pendant l'analyse (téléphone posé, personne ne le touche)
+    if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { if (closed) l.release(); else wake = l; }).catch(function () { /* refusé */ });
+
+    resize();
+    camera();
+    load();
+    loop();
+    return { close: close };
+  }
+
+  return { open: open, engine: engine, VER: VER, MODELS: MODELS };
+})();
+</script>
+
+  <script>
+/*
  * Séance › Calisthénie : figures suivies à part de la musculation (onglet CALI, une ligne par série).
  * - En haut, les quatre figures avec leur palier en cours ; toucher une figure l'affiche en dessous.
  * - Palier travaillé au choix (silhouettes), séries en secondes tenues (chrono intégré) ou en répétitions (muscle-up).
@@ -4688,6 +5237,7 @@ Views.cali = (function () {
       (many(sk) ? '<div class="field-label cali-sub">Palier · ' + (Cali.levelIdx(sk, lv) + 1) + ' sur ' + sk.levels.length + '</div>' + levelRow(sk, lv) : '<div class="cali-sub"></div>') +
       (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + fmtList(sk, prev.sets) + (best != null ? ' · record ' + fmt(sk, best) : '') + '</p>' : '<p class="muted small">' + (many(sk) ? 'Premières séries sur ce palier.' : 'Premières séries.') + '</p>') +
       '<p class="tip">' + U.esc(sug.text) + '</p>' +
+      (sk.kind === 'reps' ? '' : '<button class="btn soft block pose-launch" data-canalyse>' + App.icon('pose', 'sm') + 'Lancer l\'analyse</button>') +
       (sug.next ? '<button class="btn soft sm next-lv" data-level="' + sug.next + '">Passer en ' + U.esc(Cali.level(sk, sug.next).name.toLowerCase()) + '</button>' : '') +
       '<div class="sets">' + rows + '</div>' +
       '<div class="set-actions">' + (n > 1 ? '<button class="btn ghost" data-cless>− Série</button>' : '') + '<button class="btn ghost" data-cmore>+ Série</button></div>' +
@@ -4808,9 +5358,28 @@ Views.cali = (function () {
     });
   }
 
+  // ---------------------------------------------------------------- analyse en direct (caméra)
+
+  /** Ouvre l'analyse ; la meilleure tenue va dans la première série pas encore validée, avec sa note. */
+  function openAnalysis(root) {
+    var sk = skillNow(), lv = levelNow(sk);
+    Pose.open(app, {
+      skill: sk, level: many(sk) ? Cali.level(sk, lv) : null,
+      onDone: function (best) {
+        var sec = Math.floor(best.sec), note = 'Analyse : score ' + U.nf(best.score, 1) + '/10' + (best.clean ? ', ' + U.nf(best.clean, 1) + ' s propres' : '');
+        var rows = root.querySelectorAll('[data-crow]'), free = null;
+        for (var i = 0; i < rows.length && !free; i++) if (!rows[i].classList.contains('done')) free = rows[i];
+        if (!free || sec < 1) { app.toast('Tenu ' + U.nf(best.sec, 1) + ' s · score ' + U.nf(best.score, 1) + '/10'); return; }
+        free.querySelector('[data-val]').value = sec;
+        validate(root, Number(free.getAttribute('data-crow')), note);
+        app.toast('Série ' + free.getAttribute('data-crow') + ' : ' + sec + ' s · score ' + U.nf(best.score, 1) + '/10');
+      }
+    });
+  }
+
   // ---------------------------------------------------------------- actions
 
-  function validate(root, n) {
+  function validate(root, n, note) {
     var sk = skillNow(), lv = levelNow(sk), id = rowId(sk, lv, n);
     var row = root.querySelector('[data-crow="' + n + '"]'), el = row.querySelector('[data-val]');
     var v = U.parseNum(el.value || el.placeholder);
@@ -4823,6 +5392,7 @@ Views.cali = (function () {
     }
     var before = Cali.best(logs(), sk, lv, id);
     var rec = { id: id, date: U.today(), skill: sk.id, level: lv, setNo: n, sec: null, reps: null };
+    if (note) rec.note = note; // résultat de l'analyse (score), gardé avec la série
     rec[sk.kind === 'reps' ? 'reps' : 'sec'] = v;
     Store.put('CALI', rec);
     var p = picked(); if (p[sk.id]) { delete p[sk.id]; app.ls.set('caliPick', p); } // le palier en cours devient celui de la série
@@ -4845,6 +5415,7 @@ Views.cali = (function () {
       }
       if (e.target.closest('[data-cvideo]')) return Videos.open(app, videoKey(sk), sk.name);
       if ((b = e.target.closest('[data-chrono]'))) return openChrono(root, Number(b.getAttribute('data-chrono')));
+      if (e.target.closest('[data-canalyse]')) return openAnalysis(root);
       if ((b = e.target.closest('[data-ccheck]'))) return validate(root, Number(b.getAttribute('data-ccheck')));
       if ((b = e.target.closest('[data-cprog]'))) { state.caliProg = b.getAttribute('data-cprog'); rerender(); return; }
       if (e.target.closest('[data-cmore]') || e.target.closest('[data-cless]')) {
@@ -7147,6 +7718,8 @@ window.Views = Views;
     video: '<rect x="3.5" y="6.5" width="12" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3"/>',
     play: '<path d="M8 5.5v13l10.5-6.5L8 5.5Z"/>',
     stopwatch: '<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V10M10 3.5h4M17.5 7.5l1.5-1.5"/>',
+    pose: '<circle cx="12" cy="4.6" r="1.9"/><path d="M12 7.5v5.5M12 9.2 7 12.4M12 9.2l5 3.2M12 13l-3.6 7M12 13l3.6 7"/>',
+    flip: '<path d="M4 9.5A2.5 2.5 0 0 1 6.5 7H8l1.5-2h5L16 7h1.5A2.5 2.5 0 0 1 20 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-7Z"/><path d="M9.4 12.4a2.7 2.7 0 0 1 4.8-1.3M14.6 14.1a2.7 2.7 0 0 1-4.8 1.3M14.4 9.6v1.7h-1.7M9.6 17.1v-1.7h1.7"/>',
     trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>',
     flame: '<path d="M12 21c-3.6 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.7 2.3 3.3.2-2.9 1.6-5.5 3.6-7 .2 2.6 1.4 4.3 2.6 6 .8 1.2 1.4 2.5 1.4 4.3 0 4-2.9 7.2-7 7.2Z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.4-2.6 2.1-4 .9.9 2.1 1.8 2.9 3 .3.4.5.9.5 1.4 0 1.3-1.2 2.4-2.7 2.4Z"/>'
   };
