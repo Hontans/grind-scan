@@ -1174,6 +1174,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .lv.next .cali-picto { opacity: .5; }
 .lv.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); --pic-bg: color-mix(in srgb, var(--accent) 14%, var(--card-base)); }
 .lv.on .lv-name, .lv.on small { color: var(--accent-ink); }
+.lv.drill { width: auto; min-width: 104px; padding-inline: 10px; } /* noms d'exercices plus longs que les paliers */
 .next-lv { margin: -2px 0 8px; }
 .cali-row { grid-template-columns: 26px 1fr 1fr 46px; }
 .cali-row.solo { grid-template-columns: 26px 1fr 46px; }
@@ -1487,7 +1488,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-12 03:20 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-13 08:46 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -3284,6 +3285,8 @@ var Train = (function () {
  * Une ligne de l'onglet CALI = une série : { id, date, skill, level, setNo, sec, reps, note }.
  * Figures statiques (planche, front lever, handstand) : durée tenue en secondes ; muscle-up : répétitions.
  * Pas de surcharge. Le palier en cours est celui de la dernière série, sinon celui choisi.
+ * Exercices (drills) : à côté des paliers, des exercices qui préparent la figure (pompes pseudo planche, press…),
+ * chacun en secondes ou en répétitions ; rangés dans la colonne `level` de CALI, hors du parcours des paliers.
  */
 var Cali = (function () {
   /**
@@ -3292,9 +3295,16 @@ var Cali = (function () {
    */
   var SKILLS = [
     { id: 'planche', name: 'Planche', kind: 'hold', goal: 10, muscles: ['Épaules', 'Pectoraux', 'Abdos'],
-      levels: [{ id: 'lean', name: 'Lean', goal: 20 }, { id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }] },
+      levels: [{ id: 'lean', name: 'Lean', goal: 20 }, { id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }],
+      drills: [
+        { id: 'pseudo', name: 'Pompes pseudo', full: 'Pompes pseudo planche', kind: 'reps', muscles: ['Épaules', 'Pectoraux', 'Triceps'] },
+        { id: 'press', name: 'Press', full: 'Planche press', kind: 'reps' },
+        { id: 'wall', name: 'Contre le mur', full: 'Planche contre le mur', kind: 'hold' }] },
     { id: 'front', name: 'Front lever', kind: 'hold', goal: 10, muscles: ['Grand dorsal', 'Rhomboïdes', 'Abdos'],
-      levels: [{ id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'one-leg', name: 'One leg' }, { id: 'half-lay', name: 'Half lay' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }] },
+      levels: [{ id: 'tuck', name: 'Tuck' }, { id: 'adv-tuck', name: 'Adv. tuck' }, { id: 'one-leg', name: 'One leg' }, { id: 'half-lay', name: 'Half lay' }, { id: 'straddle', name: 'Straddle' }, { id: 'full', name: 'Full' }],
+      drills: [
+        { id: 'raises', name: 'Montées', full: 'Montées en front lever', kind: 'reps' },
+        { id: 'rows', name: 'Tirages', full: 'Tirages en front lever', kind: 'reps', muscles: ['Grand dorsal', 'Rhomboïdes', 'Biceps'] }] },
     { id: 'muscleup', name: 'Muscle-up', kind: 'reps', goal: null, muscles: ['Grand dorsal', 'Pectoraux', 'Triceps', 'Biceps'],
       levels: [{ id: 'strict', name: 'Strict' }] },
     { id: 'handstand', name: 'Handstand', kind: 'hold', goal: 30, muscles: ['Épaules', 'Triceps', 'Trapèzes'],
@@ -3303,20 +3313,36 @@ var Cali = (function () {
   var GOAL_SETS = 3;
 
   function skill(id) { return SKILLS.filter(function (s) { return s.id === id; })[0] || null; }
+  /** Rang d'un palier dans le parcours (−1 pour un exercice ou un id inconnu). */
   function levelIdx(sk, lv) { for (var i = 0; i < sk.levels.length; i++) if (sk.levels[i].id === lv) return i; return -1; }
-  function level(sk, lv) { return sk.levels[levelIdx(sk, lv)] || null; }
-  function goalOf(sk, lv) { var l = level(sk, lv); return (l && l.goal) || sk.goal; }
-  function valOf(sk, r) { var v = sk.kind === 'reps' ? r.reps : r.sec; return typeof v === 'number' && isFinite(v) && v > 0 ? v : null; }
-  function unit(sk, v) { return sk.kind === 'reps' ? (v > 1 ? 'reps' : 'rep') : 's'; }
+  function drill(sk, id) { return (sk.drills || []).filter(function (d) { return d.id === id; })[0] || null; }
+  /** Palier ou exercice d'une figure. */
+  function level(sk, lv) { return sk.levels[levelIdx(sk, lv)] || drill(sk, lv); }
+  function isDrill(sk, lv) { return !!drill(sk, lv); }
+  /** « hold » (secondes tenues) ou « reps » : celui de l'exercice, sinon celui de la figure. */
+  function kindOf(sk, lv) { var d = drill(sk, lv); return (d && d.kind) || sk.kind; }
+  /** Objectif d'un palier (celui de la figure par défaut) ; un exercice n'en a que s'il le déclare. */
+  function goalOf(sk, lv) { var d = drill(sk, lv); if (d) return d.goal || null; var l = level(sk, lv); return (l && l.goal) || sk.goal; }
+  function musclesOf(sk, lv) { var l = level(sk, lv); return (l && l.muscles) || sk.muscles; }
+  /** Nom complet : « Planche tuck », « Pompes pseudo planche », « Muscle-up ». */
+  function title(sk, lv) {
+    var d = drill(sk, lv), l = level(sk, lv);
+    return d ? d.full || sk.name + ' ' + d.name.toLowerCase() : sk.name + (l && sk.levels.length > 1 ? ' ' + l.name.toLowerCase() : '');
+  }
+  function valOf(sk, r) { var v = kindOf(sk, r.level) === 'reps' ? r.reps : r.sec; return typeof v === 'number' && isFinite(v) && v > 0 ? v : null; }
+  function unit(sk, v, lv) { return kindOf(sk, lv) === 'reps' ? (v > 1 ? 'reps' : 'rep') : 's'; }
 
   function of(logs, sk, lv) {
     return (logs || []).filter(function (r) { return r.skill === sk.id && (!lv || r.level === lv) && valOf(sk, r) !== null; });
   }
 
-  /** Palier en cours : le choix fait à l'écran s'il y en a un, sinon celui de la dernière série, sinon le premier. */
+  /**
+   * Palier en cours (jamais un exercice) : le choix fait à l'écran s'il y en a un, sinon celui de la dernière série
+   * faite sur un palier, sinon le premier.
+   */
   function current(logs, sk, picked) {
     if (picked && levelIdx(sk, picked) >= 0) return picked;
-    var list = of(logs, sk).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.setNo || 0) - (a.setNo || 0); });
+    var list = of(logs, sk).filter(function (r) { return levelIdx(sk, r.level) >= 0; }).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.setNo || 0) - (a.setNo || 0); });
     return list.length ? list[0].level : sk.levels[0].id;
   }
 
@@ -3376,10 +3402,10 @@ var Cali = (function () {
    * sinon + 1 s (ou + 1 rep) sur la meilleure série (aim). Sans objectif (muscle-up) : + 1 rep, avec le record.
    */
   function suggest(logs, sk, lv, today) {
-    var prev = last(logs, sk, lv, today), g = goalOf(sk, lv), i = levelIdx(sk, lv), nxt = sk.levels[i + 1];
-    var u = function (v) { return v + (sk.kind === 'reps' ? ' rep' + (v > 1 ? 's' : '') : ' s'); };
+    var prev = last(logs, sk, lv, today), g = goalOf(sk, lv), i = levelIdx(sk, lv), nxt = i >= 0 ? sk.levels[i + 1] : null;
+    var reps = kindOf(sk, lv) === 'reps', u = function (v) { return v + (reps ? ' rep' + (v > 1 ? 's' : '') : ' s'); };
     var goal = g ? GOAL_SETS + ' × ' + u(g) : '';
-    if (!prev) return { aim: null, text: g ? 'Objectif du palier : ' + goal : 'Premières séries : note tes répétitions' };
+    if (!prev) return { aim: null, text: g ? 'Objectif du palier : ' + goal : reps ? 'Premières séries : note tes répétitions' : 'Premières séries : note le temps tenu' };
     var top = Math.max.apply(null, prev.sets.map(function (r) { return valOf(sk, r); }));
     if (!g) {
       var b = best(logs, sk, lv);
@@ -3503,7 +3529,13 @@ var Cali = (function () {
       tuck: { H: [86.7, 33.7], S: [80, 27], C: [70, 17], P: [59, 22], arm: [[72, 54], [66.5, 56]], leg: [[74, 36], [55, 40], [49.6, 41.1]] },
       'adv-tuck': { leg: [[58.5, 45.9], [39, 42.5], [33.6, 41.6]] },
       straddle: { leg: [[35.6, 27.6], [15.7, 30.2], [9.8, 31]], farLeg: [[35.7, 22.2], [15.9, 19.6], [10.1, 18.8]] },
-      full: {}
+      full: {},
+      // Exercices : pompes en lean (flèche haut / bas), press (des pieds au sol à la tuck), planche pieds au mur.
+      pseudo: { props: [FLOOR, 'M70 5 V21', 'M66.6 8.4 L70 5 L73.4 8.4', 'M66.6 17.6 L70 21 L73.4 17.6'],
+        H: [88.8, 24.5], S: [80, 28], P: [55.8, 37.6], arm: [[68, 54], [62.3, 56]], leg: [[36.3, 45.3], [17.7, 52.7], [13, 57.2]] },
+      press: { props: [FLOOR, 'M41 55 C36 45 41 33 52 27.5', 'M46.4 26.4 L52 27.5 L48.9 32.3'],
+        H: [86.7, 33.7], S: [80, 27], C: [70, 17], P: [59, 22], arm: [[72, 54], [66.5, 56]], leg: [[74, 36], [55, 40], [49.6, 41.1]] },
+      wall: { props: [FLOOR, 'M6.6 6 V57.5'] }
     },
     front: { vb: '0 0 100 60', props: ['M19 4.2 H63'],
       base: { sT: -1, sA: -1, H: [8, 33], S: [17.5, 33], P: [43.5, 33], arm: [[31.7, 8.9], [34.4, 4.2]], leg: [[64.5, 33], [84.5, 33], [90.5, 33]] },
@@ -3512,7 +3544,11 @@ var Cali = (function () {
       'one-leg': { farLeg: [[42, 12], [62, 13], [67.5, 13.3]] },
       'half-lay': { leg: [[64.5, 33], [65.5, 53], [65.8, 58.5]] },
       straddle: { leg: [[64.4, 35.6], [84.2, 38.4], [90.1, 39.2]], farLeg: [[64.4, 30.4], [84.2, 27.6], [90.1, 26.8]] },
-      full: {}
+      full: {},
+      // Exercices : montées (jambes qui remontent jusqu'à l'horizontale), tirages (corps tiré vers la barre).
+      raises: { props: ['M19 4.2 H63', 'M66 57 C80 56 88 50 90.5 42', 'M87.2 45.6 L90.5 42 L92.6 46.6'] },
+      rows: { props: ['M19 4.2 H63', 'M56 9 V26', 'M52.6 12.4 L56 9 L59.4 12.4', 'M52.6 22.6 L56 26 L59.4 22.6'],
+        H: [8.9, 28.9], C: [28, 38], P: [38, 30], leg: [[27, 15.5], [45, 22], [50.2, 23.9]] }
     },
     muscleup: { vb: '0 0 150 90', props: ['M52 47 H112', 'M47 78 C39 60 41 38 56 23', 'M50 23.5 L56.5 22.6 L55.6 29.2'],
       base: { sT: -1, sA: -1, H: [80.5, 9.2], S: [78.5, 18.5], P: [73, 44], arm: [[80, 45.5], [84.5, 46.5]], leg: [[70.5, 64.8], [68.3, 84.6], [67.6, 89.6]] },
@@ -3525,7 +3561,7 @@ var Cali = (function () {
     }
   };
 
-  /** Silhouette d'un palier (muscles de la figure allumés). */
+  /** Silhouette d'un palier ou d'un exercice (muscles travaillés allumés). */
   function picto(skillId, lv, cls) {
     var set = FIG[skillId], sk = skill(skillId), l = sk && level(sk, lv);
     if (!set || !sk) return '';
@@ -3533,13 +3569,14 @@ var Cali = (function () {
     for (k in base) f[k] = base[k];
     for (k in ov) f[k] = ov[k];
     var vb = set.vb.split(' ').map(Number), sw = (2.2 * vb[2] / 100).toFixed(2);
-    var lit = sk.muscles.map(function (g) { return SEEN_AS[g] || g; });
+    var lit = musclesOf(sk, lv).map(function (g) { return SEEN_AS[g] || g; });
     var props = (ov.props || set.props).map(function (d) { return '<path class="cp-prop" stroke-width="' + sw + '" d="' + d + '"/>'; }).join('');
-    return '<svg class="cali-picto ' + (cls || '') + '" viewBox="' + set.vb + '" role="img" aria-label="' + U.esc(sk.name + (l && sk.levels.length > 1 ? ' ' + l.name : '')) + '">' + props +
+    return '<svg class="cali-picto ' + (cls || '') + '" viewBox="' + set.vb + '" role="img" aria-label="' + U.esc(l ? title(sk, lv) : sk.name) + '">' + props +
       '<g class="cp-body" stroke-width="' + (0.6 * vb[2] / 100).toFixed(2) + '">' + body(f, lit) + '</g></svg>';
   }
 
-  return { SKILLS: SKILLS, GOAL_SETS: GOAL_SETS, skill: skill, level: level, levelIdx: levelIdx, goalOf: goalOf, valOf: valOf, unit: unit,
+  return { SKILLS: SKILLS, GOAL_SETS: GOAL_SETS, skill: skill, level: level, levelIdx: levelIdx, isDrill: isDrill, kindOf: kindOf, goalOf: goalOf,
+    musclesOf: musclesOf, title: title, valOf: valOf, unit: unit,
     current: current, best: best, last: last, progress: progress, goalMet: goalMet, path: path, suggest: suggest, picto: picto };
 })();
 </script>
@@ -5158,6 +5195,7 @@ var Pose = (function () {
  * Séance › Calisthénie : figures suivies à part de la musculation (onglet CALI, une ligne par série).
  * - En haut, les quatre figures avec leur palier en cours ; toucher une figure l'affiche en dessous.
  * - Palier travaillé au choix (silhouettes), séries en secondes tenues (chrono intégré) ou en répétitions (muscle-up).
+ * - Exercices de la figure (pompes pseudo planche, press…) choisis sous les paliers, hors du parcours.
  * - Conseil : + 1 s (ou + 1 rep) sur la meilleure série, palier suivant proposé une fois l'objectif tenu.
  * - Vidéos d'exécution par figure (comme en musculation), progression par palier et parcours des paliers.
  * - Saisies pas encore validées gardées sur le téléphone (verrouillage), comme en musculation.
@@ -5169,17 +5207,25 @@ Views.cali = (function () {
   function logs() { return Store.list('CALI'); }
   function picked() { return app.ls.get('caliPick', {}) || {}; }
   function skillNow() { var id = app.ls.get('caliSkill', null); return Cali.skill(id) || Cali.SKILLS[0]; }
-  function levelNow(sk) { return Cali.current(logs(), sk, picked()[sk.id]); }
+  /** Palier ou exercice affiché dans la séance. */
+  function levelNow(sk) { var p = picked()[sk.id]; return p && Cali.isDrill(sk, p) ? p : Cali.current(logs(), sk, p); }
+  /** Palier du parcours (jamais un exercice) : vignettes, rangée des paliers, parcours. */
+  function stageNow(sk) { return Cali.current(logs(), sk, picked()[sk.id]); }
+  function isReps(sk, lv) { return Cali.kindOf(sk, lv) === 'reps'; }
   function extra(sk, lv) { return (app.ls.get('caliExtra', {}) || {})[sk.id + '|' + lv] || 0; }
   function rowId(sk, lv, n) { return 'c-' + U.today() + '-' + sk.id + '-' + lv + '-' + n; }
   function many(sk) { return sk.levels.length > 1; }
-  /** « 9 s », « 5 reps ». */
-  function fmt(sk, v) { return v == null ? '–' : U.nf(v, 0) + (sk.kind === 'reps' ? ' rep' + (v > 1 ? 's' : '') : ' s'); }
+  /** « 9 s », « 5 reps » (unité du palier ou de l'exercice lv). */
+  function fmt(sk, v, lv) { return v == null ? '–' : U.nf(v, 0) + (isReps(sk, lv) ? ' rep' + (v > 1 ? 's' : '') : ' s'); }
   function fmtList(sk, sets) {
-    return sets.map(function (r) { return U.nf(Cali.valOf(sk, r), 0) + (sk.kind === 'reps' ? '' : ' s'); }).join(' · ') + (sk.kind === 'reps' ? ' reps' : '');
+    var reps = sets.length && isReps(sk, sets[0].level);
+    return sets.map(function (r) { return U.nf(Cali.valOf(sk, r), 0) + (reps ? '' : ' s'); }).join(' · ') + (reps ? ' reps' : '');
   }
-  /** Vidéos rangées à part des exercices de musculation (une « Planche » de gainage n'est pas la planche). */
-  function videoKey(sk) { return 'Calisthénie · ' + sk.name; }
+  /**
+   * Vidéos rangées à part des exercices de musculation (une « Planche » de gainage n'est pas la planche) :
+   * une liste par figure (tous ses paliers), une par exercice.
+   */
+  function videoKey(sk, lv) { return 'Calisthénie · ' + (Cali.isDrill(sk, lv) ? Cali.title(sk, lv) : sk.name); }
   /** Saisies tapées mais pas validées, pour aujourd'hui seulement. */
   function drafts() { var d = app.ls.get('caliDraft', null); return d && d.date === U.today() ? d.rows || {} : {}; }
   function setDraft(k, v) {
@@ -5192,54 +5238,66 @@ Views.cali = (function () {
 
   function tiles(cur) {
     return '<div class="cali-tiles">' + Cali.SKILLS.map(function (sk) {
-      var lv = levelNow(sk), i = Cali.levelIdx(sk, lv), b = Cali.best(logs(), sk, lv);
+      var lv = stageNow(sk), i = Cali.levelIdx(sk, lv), b = Cali.best(logs(), sk, lv);
       return '<button class="tile cali-tile' + (sk.id === cur.id ? ' on' : '') + '" data-skill="' + sk.id + '">' +
         '<span class="ct-fig">' + Cali.picto(sk.id, lv) + '</span>' +
         '<span class="ct-name">' + U.esc(sk.name) + '</span>' +
         '<span class="ct-level">' + (many(sk) ? U.esc(Cali.level(sk, lv).name) : 'Répétitions') + '</span>' +
         (many(sk) ? '<span class="ct-dots" aria-label="Palier ' + (i + 1) + ' sur ' + sk.levels.length + '">' + sk.levels.map(function (l, k) { return '<i class="' + (k < i ? 'done' : k === i ? 'now' : '') + '"></i>'; }).join('') + '</span>' : '<span class="ct-dots"></span>') +
-        '<span class="tile-note">' + (b == null ? 'Pas encore de série' : 'Record ' + fmt(sk, b)) + '</span></button>';
+        '<span class="tile-note">' + (b == null ? 'Pas encore de série' : 'Record ' + fmt(sk, b, lv)) + '</span></button>';
     }).join('') + '</div>';
   }
 
   // ---------------------------------------------------------------- figure du jour
 
   function levelRow(sk, lv) {
-    var ci = Cali.levelIdx(sk, lv);
+    var ci = Cali.levelIdx(sk, stageNow(sk));
     return '<div class="lv-row" data-lv-row>' + sk.levels.map(function (l, i) {
       var b = Cali.best(logs(), sk, l.id), st = i < ci ? 'done' : i === ci ? 'now' : 'next';
       return '<button class="lv ' + st + (l.id === lv ? ' on' : '') + '" data-level="' + l.id + '" aria-pressed="' + (l.id === lv) + '">' +
         Cali.picto(sk.id, l.id) + '<span class="lv-name">' + U.esc(l.name) + '</span>' +
-        '<small>' + (st === 'done' ? App.icon('check', 'xs') + (b == null ? 'Passé' : fmt(sk, b)) : b == null ? (st === 'now' ? 'En cours' : 'À venir') : 'Record ' + fmt(sk, b)) + '</small></button>';
+        '<small>' + (st === 'done' ? App.icon('check', 'xs') + (b == null ? 'Passé' : fmt(sk, b, l.id)) : b == null ? (st === 'now' ? 'En cours' : 'À venir') : 'Record ' + fmt(sk, b, l.id)) + '</small></button>';
+    }).join('') + '</div>';
+  }
+
+  /** Exercices de la figure, hors parcours : record ou unité. */
+  function drillRow(sk, lv) {
+    return '<div class="lv-row" data-lv-row>' + sk.drills.map(function (d) {
+      var b = Cali.best(logs(), sk, d.id);
+      return '<button class="lv drill' + (d.id === lv ? ' on' : '') + '" data-level="' + d.id + '" aria-pressed="' + (d.id === lv) + '">' +
+        Cali.picto(sk.id, d.id) + '<span class="lv-name">' + U.esc(d.name) + '</span>' +
+        '<small>' + (b != null ? 'Record ' + fmt(sk, b, d.id) : isReps(sk, d.id) ? 'Répétitions' : 'Secondes') + '</small></button>';
     }).join('') + '</div>';
   }
 
   function skillCard(sk) {
     var lv = levelNow(sk), today = U.today();
     var prev = Cali.last(logs(), sk, lv, today), sug = Cali.suggest(logs(), sk, lv, today), best = Cali.best(logs(), sk, lv);
-    var n = Math.max(Cali.GOAL_SETS + extra(sk, lv), 1), rows = '', draft = drafts(), unit = sk.kind === 'reps' ? 'reps' : 's';
+    var reps = isReps(sk, lv), drill = Cali.isDrill(sk, lv), muscles = Cali.musclesOf(sk, lv);
+    var n = Math.max(Cali.GOAL_SETS + extra(sk, lv), 1), rows = '', draft = drafts(), unit = reps ? 'reps' : 's';
     for (var i = 1; i <= n; i++) {
       var saved = Store.get('CALI', rowId(sk, lv, i)), v = saved ? Cali.valOf(sk, saved) : null;
       var ps = prev && prev.sets[i - 1], ph = i === 1 && sug.aim ? sug.aim : ps ? Cali.valOf(sk, ps) : null;
       var dv = !saved && draft[sk.id + '|' + lv + '|' + i] || '';
-      rows += '<div class="set-row cali-row' + (sk.kind === 'reps' ? ' solo' : '') + (saved ? ' done' : '') + '" data-crow="' + i + '">' +
+      rows += '<div class="set-row cali-row' + (reps ? ' solo' : '') + (saved ? ' done' : '') + '" data-crow="' + i + '">' +
         '<span class="set-n">' + i + '</span>' +
-        '<span class="field-box"><input inputmode="numeric" data-val placeholder="' + (ph == null ? unit : ph) + '" value="' + (v == null ? U.esc(dv) : v) + '"><span class="unit">' + unit + '</span></span>' +
-        (sk.kind === 'reps' ? '' : '<button class="btn soft chrono-btn" data-chrono="' + i + '">' + App.icon('stopwatch', 'sm') + 'Chrono</button>') +
+        '<span class="field-box"><input inputmode="numeric" data-val placeholder="' + (ph == null ? '–' : ph) + '" value="' + (v == null ? U.esc(dv) : v) + '"><span class="unit">' + unit + '</span></span>' +
+        (reps ? '' : '<button class="btn soft chrono-btn" data-chrono="' + i + '">' + App.icon('stopwatch', 'sm') + 'Chrono</button>') +
         '<button class="check" data-ccheck="' + i + '" aria-label="Valider la série ' + i + '">' + App.icon('check') + '</button></div>';
     }
-    var vids = Videos.of(videoKey(sk)).length;
+    var vids = Videos.of(videoKey(sk, lv)).length;
     return '<section class="card cali-card">' +
       '<div class="cali-top"><div class="start-text">' +
-      '<span class="tile-label">' + (sk.kind === 'reps' ? 'Répétitions' : 'Statique · durée tenue') + '</span>' +
-      '<h2>' + U.esc(sk.name) + '</h2>' +
-      '<p class="muted small">' + sk.muscles.map(U.esc).join(' · ') + '</p>' +
+      '<span class="tile-label">' + (drill ? 'Exercice · ' + (reps ? 'répétitions' : 'durée tenue') : reps ? 'Répétitions' : 'Statique · durée tenue') + '</span>' +
+      '<h2>' + U.esc(drill ? Cali.title(sk, lv) : sk.name) + '</h2>' +
+      '<p class="muted small">' + muscles.map(U.esc).join(' · ') + '</p>' +
       '<button class="ex-video" data-cvideo>' + App.icon('video', 'sm') + (vids ? 'Mes vidéos (' + vids + ')' : 'Ajouter une vidéo') + '</button></div>' +
-      '<div class="ex-fig">' + Body.mini(sk.muscles) + '</div></div>' +
-      (many(sk) ? '<div class="field-label cali-sub">Palier · ' + (Cali.levelIdx(sk, lv) + 1) + ' sur ' + sk.levels.length + '</div>' + levelRow(sk, lv) : '<div class="cali-sub"></div>') +
-      (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + fmtList(sk, prev.sets) + (best != null ? ' · record ' + fmt(sk, best) : '') + '</p>' : '<p class="muted small">' + (many(sk) ? 'Premières séries sur ce palier.' : 'Premières séries.') + '</p>') +
+      '<div class="ex-fig">' + Body.mini(muscles) + '</div></div>' +
+      (many(sk) ? '<div class="field-label cali-sub">Palier · ' + (Cali.levelIdx(sk, stageNow(sk)) + 1) + ' sur ' + sk.levels.length + '</div>' + levelRow(sk, lv) : '<div class="cali-sub"></div>') +
+      (sk.drills ? '<div class="field-label cali-sub">Exercices</div>' + drillRow(sk, lv) : '') +
+      (prev ? '<p class="muted small">Dernière fois (' + U.shortDate(prev.date) + ') : ' + fmtList(sk, prev.sets) + (best != null ? ' · record ' + fmt(sk, best, lv) : '') + '</p>' : '<p class="muted small">' + (drill ? 'Premières séries sur cet exercice.' : many(sk) ? 'Premières séries sur ce palier.' : 'Premières séries.') + '</p>') +
       '<p class="tip">' + U.esc(sug.text) + '</p>' +
-      (sk.kind === 'reps' ? '' : '<button class="btn soft block pose-launch" data-canalyse>' + App.icon('pose', 'sm') + 'Lancer l\'analyse</button>') +
+      (reps || drill ? '' : '<button class="btn soft block pose-launch" data-canalyse>' + App.icon('pose', 'sm') + 'Lancer l\'analyse</button>') +
       (sug.next ? '<button class="btn soft sm next-lv" data-level="' + sug.next + '">Passer en ' + U.esc(Cali.level(sk, sug.next).name.toLowerCase()) + '</button>' : '') +
       '<div class="sets">' + rows + '</div>' +
       '<div class="set-actions">' + (n > 1 ? '<button class="btn ghost" data-cless>− Série</button>' : '') + '<button class="btn ghost" data-cmore>+ Série</button></div>' +
@@ -5249,9 +5307,10 @@ Views.cali = (function () {
   // ---------------------------------------------------------------- progression et parcours
 
   function progressCard(sk) {
-    var lv = levelNow(sk), worked = sk.levels.filter(function (l) { return Cali.progress(logs(), sk, l.id).length; });
+    // Un exercice affiché : sa courbe seule ; un palier : choix parmi les paliers déjà travaillés.
+    var lv = levelNow(sk), drill = Cali.isDrill(sk, lv), worked = drill ? [] : sk.levels.filter(function (l) { return Cali.progress(logs(), sk, l.id).length; });
     var show = state.caliProg && worked.some(function (l) { return l.id === state.caliProg; }) ? state.caliProg : lv;
-    var p = Cali.progress(logs(), sk, show), unit = sk.kind === 'reps' ? 'reps' : 's';
+    var p = Cali.progress(logs(), sk, show), reps = isReps(sk, show), unit = reps ? 'reps' : 's';
     var stats = '';
     if (p.length) {
       var best = Math.max.apply(null, p.map(function (d) { return d.best; })), lastD = p[p.length - 1];
@@ -5261,15 +5320,15 @@ Views.cali = (function () {
         '<div class="stat"><span class="tile-label">Séances</span><b>' + p.length + '</b></div></div>';
     }
     var chart = Views.trends.lineChart(p.map(function (d) { return { date: d.date, v: d.best }; }), {
-      unit: unit, dec: 0, name: sk.kind === 'reps' ? 'Meilleure série' : 'Meilleure tenue', label: sk.name + (many(sk) ? ' ' + Cali.level(sk, show).name : ''),
+      unit: unit, dec: 0, name: reps ? 'Meilleure série' : 'Meilleure tenue', label: drill ? Cali.title(sk, show) : sk.name + (many(sk) ? ' ' + Cali.level(sk, show).name : ''),
       detail: function (pt) { var d = p.filter(function (x) { return x.date === pt.date; })[0]; return d ? [d.sets.length + ' séries : ' + fmtList(sk, d.sets)] : []; }
     });
     var parcours = '';
     if (many(sk)) {
-      var path = Cali.path(logs(), sk, lv);
+      var path = Cali.path(logs(), sk, stageNow(sk));
       parcours = '<div class="field-label cali-sub">Parcours</div><ol class="cali-path">' + path.map(function (s, i) {
-        var nx = path[i + 1], goal = Cali.GOAL_SETS + ' × ' + Cali.goalOf(sk, s.level.id) + ' ' + unit;
-        var note = s.state === 'done' ? (s.first ? U.shortDate(s.first) + ' → ' + (nx && nx.first ? U.shortDate(nx.first) : '') : 'Passé') + (s.best != null ? ' · record ' + fmt(sk, s.best) : '') :
+        var nx = path[i + 1], goal = Cali.GOAL_SETS + ' × ' + Cali.goalOf(sk, s.level.id) + ' ' + (isReps(sk, s.level.id) ? 'reps' : 's');
+        var note = s.state === 'done' ? (s.first ? U.shortDate(s.first) + ' → ' + (nx && nx.first ? U.shortDate(nx.first) : '') : 'Passé') + (s.best != null ? ' · record ' + fmt(sk, s.best, s.level.id) : '') :
           s.state === 'now' ? (s.first ? 'Depuis le ' + U.shortDate(s.first) + ' · ' : '') + (s.metOn ? 'objectif tenu le ' + U.shortDate(s.metOn) : 'objectif ' + goal) :
           'Objectif ' + goal;
         return '<li class="cp-' + s.state + '"><i class="cp-dot">' + (s.state === 'done' ? App.icon('check', 'xs') : '') + '</i>' +
@@ -5277,7 +5336,7 @@ Views.cali = (function () {
           '<span class="cp-text"><b>' + U.esc(s.level.name) + '</b><span class="muted small">' + note + '</span></span></li>';
       }).join('') + '</ol>';
     }
-    return '<section class="card"><div class="card-head"><h2>Progression</h2><span class="muted small">' + U.esc(sk.name) + '</span></div>' +
+    return '<section class="card"><div class="card-head"><h2>Progression</h2><span class="muted small">' + U.esc(drill ? Cali.title(sk, lv) : sk.name) + '</span></div>' +
       (worked.length > 1 ? '<div class="seg prog-seg">' + worked.map(function (l) { return '<button data-cprog="' + l.id + '" aria-pressed="' + (l.id === show) + '">' + U.esc(l.name) + '</button>'; }).join('') + '</div>' : '') +
       stats + chart + parcours + '</section>';
   }
@@ -5304,9 +5363,9 @@ Views.cali = (function () {
       html: dates.length ? '<ul class="list">' + dates.map(function (date) {
         return '<li class="hist-row"><span class="entry-name">' + U.dayLetter(date) + ' ' + U.shortDate(date) + '</span>' +
           Object.keys(days[date]).map(function (k) {
-            var parts = k.split('|'), sk = Cali.skill(parts[0]), l = Cali.level(sk, parts[1]);
+            var parts = k.split('|'), sk = Cali.skill(parts[0]);
             var sets = days[date][k].sort(function (a, b) { return (a.setNo || 0) - (b.setNo || 0); });
-            return '<span class="muted small">' + U.esc(sk.name + (many(sk) && l ? ' ' + l.name.toLowerCase() : '')) + ' : ' + fmtList(sk, sets) + '</span>';
+            return '<span class="muted small">' + U.esc(Cali.title(sk, parts[1])) + ' : ' + fmtList(sk, sets) + '</span>';
           }).join('') + '</li>';
       }).join('') + '</ul>' : '<p class="muted">Pas encore de série de calisthénie.</p>'
     });
@@ -5320,7 +5379,7 @@ Views.cali = (function () {
     var t0 = null, raf = null, stopped = false, buzzed = {};
     var mark = best != null && g && best < g ? '<circle class="rec-mark" cx="' + (100 + 92 * Math.cos(2 * Math.PI * best / g)).toFixed(1) + '" cy="' + (100 + 92 * Math.sin(2 * Math.PI * best / g)).toFixed(1) + '" r="4"/>' : '';
     app.openSheet({
-      title: sk.name + (many(sk) ? ' · ' + Cali.level(sk, lv).name : ''),
+      title: Cali.isDrill(sk, lv) ? Cali.title(sk, lv) : sk.name + (many(sk) ? ' · ' + Cali.level(sk, lv).name : ''),
       html: '<div class="chrono" data-chrono-box><div class="chrono-dial">' +
         '<svg viewBox="0 0 200 200" aria-hidden="true"><circle class="track" cx="100" cy="100" r="92"/><circle class="val" cx="100" cy="100" r="92" stroke-dasharray="' + RING.toFixed(1) + '" stroke-dashoffset="' + RING.toFixed(1) + '" data-cring/>' + mark + '</svg>' +
         '<div class="chrono-read"><div class="chrono-t" data-ct>' + COUNTDOWN + '</div><div class="chrono-sub" data-cs>Mets-toi en place</div></div></div>' +
@@ -5387,7 +5446,8 @@ Views.cali = (function () {
     var sk = skillNow(), lv = levelNow(sk), id = rowId(sk, lv, n);
     var row = root.querySelector('[data-crow="' + n + '"]'), el = row.querySelector('[data-val]');
     var v = U.parseNum(el.value || el.placeholder);
-    if (v === null || v <= 0) { app.toast(sk.kind === 'reps' ? 'Indique le nombre de répétitions' : 'Indique le temps tenu'); el.focus(); return; }
+    var reps = isReps(sk, lv), drill = Cali.isDrill(sk, lv);
+    if (v === null || v <= 0) { app.toast(reps ? 'Indique le nombre de répétitions' : 'Indique le temps tenu'); el.focus(); return; }
     v = Math.round(v);
     var was = Store.get('CALI', id);
     setDraft(sk.id + '|' + lv + '|' + n, null);
@@ -5397,14 +5457,15 @@ Views.cali = (function () {
     var before = Cali.best(logs(), sk, lv, id);
     var rec = { id: id, date: U.today(), skill: sk.id, level: lv, setNo: n, sec: null, reps: null };
     if (note) rec.note = note; // résultat de l'analyse (score), gardé avec la série
-    rec[sk.kind === 'reps' ? 'reps' : 'sec'] = v;
+    rec[reps ? 'reps' : 'sec'] = v;
     Store.put('CALI', rec);
-    var p = picked(); if (p[sk.id]) { delete p[sk.id]; app.ls.set('caliPick', p); } // le palier en cours devient celui de la série
+    // Le palier en cours devient celui de la série ; un exercice reste affiché (il ne change pas le palier).
+    var p = picked(); if (p[sk.id] && !drill) { delete p[sk.id]; app.ls.set('caliPick', p); }
     el.value = v;
     row.classList.remove('just'); void row.offsetWidth; row.classList.add('done', 'just');
-    if (before !== null && v > before) app.toast('Record' + (many(sk) ? ' en ' + Cali.level(sk, lv).name.toLowerCase() : '') + ' : ' + fmt(sk, v));
+    if (before !== null && v > before) app.toast('Record' + (drill ? ' · ' + Cali.level(sk, lv).name : many(sk) ? ' en ' + Cali.level(sk, lv).name.toLowerCase() : '') + ' : ' + fmt(sk, v, lv));
     app.haptic(15);
-    app.startTimer(sk.kind === 'reps' ? 180 : 120, sk.name);
+    app.startTimer(reps ? 180 : 120, sk.name);
   }
 
   function rerender() { var y = app.scrollY(); app.render(); app.scrollTo(y); }
@@ -5417,7 +5478,7 @@ Views.cali = (function () {
       if ((b = e.target.closest('[data-level]'))) {
         var p = picked(); p[sk.id] = b.getAttribute('data-level'); app.ls.set('caliPick', p); state.caliProg = null; rerender(); return;
       }
-      if (e.target.closest('[data-cvideo]')) return Videos.open(app, videoKey(sk), sk.name);
+      if (e.target.closest('[data-cvideo]')) { var vl = levelNow(sk); return Videos.open(app, videoKey(sk, vl), Cali.isDrill(sk, vl) ? Cali.title(sk, vl) : sk.name); }
       if ((b = e.target.closest('[data-chrono]'))) return openChrono(root, Number(b.getAttribute('data-chrono')));
       if (e.target.closest('[data-canalyse]')) return openAnalysis(root);
       if ((b = e.target.closest('[data-ccheck]'))) return validate(root, Number(b.getAttribute('data-ccheck')));
@@ -5440,10 +5501,12 @@ Views.cali = (function () {
       var row = e.target.closest('[data-crow]');
       if (row) { e.preventDefault(); validate(root, Number(row.getAttribute('data-crow'))); }
     });
-    // Palier en cours au milieu de la rangée (après le rendu : mesure).
+    // Palier (ou exercice) choisi au milieu de sa rangée (après le rendu : mesure).
     requestAnimationFrame(function () {
-      var r = root.querySelector('[data-lv-row]'), on = r && r.querySelector('.lv.on');
-      if (on) r.scrollLeft = on.offsetLeft - (r.clientWidth - on.offsetWidth) / 2;
+      root.querySelectorAll('[data-lv-row]').forEach(function (r) {
+        var on = r.querySelector('.lv.on');
+        if (on) r.scrollLeft = on.offsetLeft - (r.clientWidth - on.offsetWidth) / 2;
+      });
     });
   }
 
