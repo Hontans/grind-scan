@@ -572,6 +572,11 @@ svg { display: block; }
   .tabbar nav.split button { width: 44px; height: 44px; }
   .tabbar nav.split button[aria-current="page"] { width: 96px; gap: 5px; }
 }
+/* saisie au clavier dans la page (téléphone) : la barre d'onglets se retire, le verre se resserre (voir fitTyping dans App) */
+/* au retour, les icônes attendent un instant que leurs gouttes aient regonflé */
+.tabbar, #veil-b { transition: opacity .25s ease .1s; }
+html.typing .tabbar, html.typing #veil-b { opacity: 0; transition: opacity .15s; }
+html.typing .tabbar nav, html.typing .tabbar button { pointer-events: none; }
 .sheet-open .tabbar button { opacity: 0; pointer-events: none; transition: opacity .16s; }
 .sheet-open .tabbar nav { pointer-events: none; }
 .sheet-open .dock, .sheet-open .save-bar { opacity: 0; pointer-events: none; transition: opacity .16s; }
@@ -1488,7 +1493,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-13 08:46 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-18 09:58 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1770,7 +1775,7 @@ window.Liquid = (function () {
 
   var noop = function () {};
   var theme = 'dark';
-  var API = { on: false, attach: noop, remove: noop, prune: noop, track: noop, kick: noop, press: noop, lensTo: noop, lensDrag: noop, lensPress: noop, stiff: noop, dim: noop };
+  var API = { on: false, attach: noop, remove: noop, prune: noop, track: noop, kick: noop, press: noop, lensTo: noop, lensDrag: noop, lensPress: noop, stiff: noop, dim: noop, tuck: noop };
 
   // ---------------------------------------------------------------- photo et verre des cartes
   //
@@ -2096,6 +2101,15 @@ window.Liquid = (function () {
   // ---------------------------------------------------------------- taille et cadrage
 
   var cw = 0, ch = 0, dpr = 1, dprCap = 2.5;
+  // Coin haut gauche du canvas à l'écran. Il vaut 0, 0, sauf quand l'iPhone remonte toute la page au-dessus
+  // du clavier : le canvas et les éléments fixés montent ensemble, et les formes se placent par rapport au canvas
+  // (sinon le verre est dessiné une seconde fois plus haut, loin de ses icônes).
+  var ox = 0, oy = 0;
+  function origin() {
+    var r = canvas.getBoundingClientRect();
+    ox = r.left; oy = r.top;
+    return r;
+  }
   // Définition déjà jugée trop lourde pour ce téléphone (gardée une semaine) : on y démarre directement,
   // au lieu de saccader au début de chaque ouverture le temps de la retrouver.
   var DPR_KEY = 'grind:lqDpr';
@@ -2104,7 +2118,7 @@ window.Liquid = (function () {
     if (savedDpr && savedDpr.cap >= 1.5 && savedDpr.cap < dprCap && Date.now() - savedDpr.at < 7 * 864e5) dprCap = savedDpr.cap;
   } catch (e) { /* stockage indisponible */ }
   function resize() {
-    var r = canvas.getBoundingClientRect();
+    var r = origin();
     cw = r.width || window.innerWidth;
     ch = r.height || window.innerHeight;
     dpr = Math.min(window.devicePixelRatio || 1, dprCap);
@@ -2167,8 +2181,8 @@ window.Liquid = (function () {
     if (!s.el || !s.el.isConnected) return;
     var r = s.el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return;
-    s.cx.t = r.left + r.width / 2;
-    s.cy.t = r.top + r.height / 2;
+    s.cx.t = r.left - ox + r.width / 2;
+    s.cy.t = r.top - oy + r.height / 2;
     s.w.t = r.width;
     s.h.t = r.height;
     s.r.t = s.radius === 'pill' ? Math.min(r.width, r.height) / 2 : s.radius;
@@ -2176,7 +2190,7 @@ window.Liquid = (function () {
   /** Où une forme naît et disparaît : à l'intérieur de sa forme mère, d'où le col en sortant. */
   function homeOf(s) {
     var p = s.from && find(s.from);
-    if (!p || p.removing) return null;
+    if (!p || p.removing || (tucked.t && isBar(p))) return null; // barre retirée : on disparaît sur place
     if (s.morph) return { cx: p.cx.t, cy: p.cy.t, w: p.w.t, h: p.h.t, r: p.r.t };
     var hgt = Math.min(p.h.t * .62, s.h.t), wid = Math.min(s.w.t * .55, p.w.t * .6, Math.max(hgt, s.w.t * .5));
     var halfP = p.w.t / 2 - wid / 2;
@@ -2194,6 +2208,7 @@ window.Liquid = (function () {
   API.attach = function (id, el, o) {
     o = o || {};
     var s = find(id), role = o.role || 'circle';
+    origin();
     if (s) {
       s.el = el;
       s.removing = false;
@@ -2296,11 +2311,12 @@ window.Liquid = (function () {
       lens.h.t = nav.h.t - 10;
       lens.w.t = Math.max(r.width - 2, lens.h.t);
       lens.cy.t = nav.cy.t;
-      lens.cx.t = lens.drag != null ? Math.max(nav.cx.t - nav.w.t / 2 + lens.w.t / 2 + 5, Math.min(nav.cx.t + nav.w.t / 2 - lens.w.t / 2 - 5, lens.drag)) : r.left + r.width / 2;
+      lens.cx.t = lens.drag != null ? Math.max(nav.cx.t - nav.w.t / 2 + lens.w.t / 2 + 5, Math.min(nav.cx.t + nav.w.t / 2 - lens.w.t / 2 - 5, lens.drag - ox)) : r.left - ox + r.width / 2;
     }
   }
   API.lensTo = function (el) {
     var first = !lens.on;
+    origin();
     lens.el = el;
     lens.on = !!el;
     lensTargets();
@@ -2318,6 +2334,18 @@ window.Liquid = (function () {
   API.lensPress = function (on) {
     if (reduce) return;
     lens.press = on;
+    wake();
+  };
+
+  // ---------------------------------------------------------------- barre d'onglets retirée (clavier ouvert)
+
+  // Pendant une saisie dans la page, la barre d'onglets n'a rien à faire au-dessus du clavier : ses gouttes
+  // (ou sa capsule et sa pastille) se resserrent jusqu'à disparaître, puis renaissent quand le clavier se ferme.
+  var tucked = sp(0);
+  function isBar(s) { return s.id === 'nav' || s.id.indexOf('tab:') === 0; }
+  API.tuck = function (on) {
+    tucked.t = on ? 1 : 0;
+    if (reduce) { tucked.x = tucked.t; tucked.v = 0; }
     wake();
   };
 
@@ -2353,7 +2381,8 @@ window.Liquid = (function () {
     if (needMeasure || now < trackUntil) {
       needMeasure = false;
       // l'écran a changé de taille sans que resize l'ait vu (rotation sur iPhone) : on recadre
-      if (Math.abs(canvas.clientWidth - cw) > 1 || Math.abs(canvas.clientHeight - ch) > 1) resize();
+      var cr = origin();
+      if (Math.abs(cr.width - cw) > 1 || Math.abs(cr.height - ch) > 1) resize();
       shapes.forEach(function (s) { if (!s.removing) setTargetsFromEl(s); });
       lensTargets();
     }
@@ -2407,6 +2436,8 @@ window.Liquid = (function () {
     swallowed.t = sh && !sh.removing ? 1 : 0;
     for (i = 0; i < sub; i++) stepS(swallowed, 150, 1, h);
     if (!settled(swallowed)) moving = true;
+    for (i = 0; i < sub; i++) stepS(tucked, 260, 1, h);
+    if (settled(tucked)) { tucked.x = tucked.t; tucked.v = 0; } else moving = true;
 
     draw();
     // Cadence réelle des animations du verre, affichée dans les réglages.
@@ -2440,6 +2471,7 @@ window.Liquid = (function () {
       var sunk = s.id === 'nav' || s.id === 'dock' || drop ? swallowed.x : 0;
       var w = Math.max(0, s.w.x * (1 + .12 * sx - .08 * sy) + p * 8 - sunk * (drop ? s.w.x : 56));
       var hh = Math.max(0, s.h.x * (1 + .12 * sy - .08 * sx) + p * 8 - sunk * (drop ? s.h.x : 34));
+      if (tucked.x > 0 && isBar(s)) { var keep = 1 - clamp01(tucked.x); w *= keep; hh *= keep; }
       var r = Math.max(0, Math.min(s.r.x + p * 4, Math.min(w, hh) / 2));
       if (w < 1 || hh < 1) return;
       // Engloutie, une forme prend la matière de la feuille : aucune trace ne doit se voir au travers.
@@ -2456,12 +2488,13 @@ window.Liquid = (function () {
     gl.uniform4f(U.uTh, 22 + 24 * excite, theme === 'light' ? 1 : 0, 0, 0);
 
     var nav = find('nav');
-    if (lens.on && nav && !nav.removing) {
-      var sp3 = clamp01(Math.abs(lens.cx.v) / 900), b = clamp01(lens.b.x);
-      var lw = lens.w.x * (1 + .34 * sp3 + .06 * b), lh = lens.h.x * (1 - .12 * sp3 + .02 * b);
-      gl.uniform4f(U.uLens, lens.cx.x, nav.cy.x, lw / 2, lh / 2);
+    if (lens.on && nav && !nav.removing && tucked.x < .995) {
+      // capsule retirée (clavier) : la pastille se resserre avec elle, vers son centre
+      var sp3 = clamp01(Math.abs(lens.cx.v) / 900), b = clamp01(lens.b.x), k = 1 - clamp01(tucked.x);
+      var lw = lens.w.x * (1 + .34 * sp3 + .06 * b) * k, lh = lens.h.x * (1 - .12 * sp3 + .02 * b) * k;
+      gl.uniform4f(U.uLens, nav.cx.x + (lens.cx.x - nav.cx.x) * k, nav.cy.x, lw / 2, lh / 2);
       // Renflement : tant que la pastille bouge, elle dépasse de la capsule et le col se forme.
-      gl.uniform4f(U.uLensM, lh / 2, lens.a, nav.h.x / 2 - 5 + b * 13, 2 + 34 * b);
+      gl.uniform4f(U.uLensM, lh / 2, lens.a, (nav.h.x / 2 - 5 + b * 13) * k, 2 + 34 * b);
     } else {
       gl.uniform4f(U.uLens, 0, 0, 0, 0);
       gl.uniform4f(U.uLensM, 0, 0, 0, 1);
@@ -2534,7 +2567,7 @@ window.Liquid = (function () {
   }, { passive: true });
 
   resize();
-  API.debug = function () { return { shapes: shapes.map(function (s) { return [s.id, Math.round(s.cx.x), Math.round(s.cy.x), Math.round(s.w.x), Math.round(s.h.x)]; }), lens: lens.on, dpr: dpr }; };
+  API.debug = function () { return { shapes: shapes.map(function (s) { return [s.id, Math.round(s.cx.x), Math.round(s.cy.x), Math.round(s.w.x), Math.round(s.h.x)]; }), lens: lens.on, dpr: dpr, origin: [ox, oy], tucked: tucked.x }; };
   return API;
 })();
 </script>
@@ -8644,18 +8677,36 @@ window.Views = Views;
       if (r.bottom > b.bottom - 12) inSheet.scrollTop += r.bottom - b.bottom + 12;
       else if (r.top < b.top + 12) inSheet.scrollTop -= b.top + 12 - r.top;
     }
+    fitTyping();
     Glass.track(450);
   }
   // Le clavier s'ouvre et se ferme en ~0,3 s, et l'iPhone ne prévient pas toujours à la fin : on revérifie.
   function fitKeyboardSoon() {
     [0, 120, 320, 650, 1100].forEach(function (t) { setTimeout(fitKeyboard, t); });
   }
+  // Saisie au clavier dans la page (note du jour, reps et kg d'une série…) sur un téléphone : l'iPhone remonte
+  // toute la page au-dessus du clavier, barre d'onglets comprise, qui se retrouve au milieu de l'écran sur le contenu.
+  // Elle se retire donc le temps de la saisie (html.typing, et ses verres se resserrent : Liquid.tuck).
+  // Dans une feuille, rien à faire : la barre est déjà cachée sous elle.
+  var touchUI = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  var NO_KEYS = /^(checkbox|radio|range|button|submit|reset|file|color|image|hidden|date|time|month|week|datetime-local)$/;
+  var typing = false;
+  function fitTyping() {
+    var a = editing();
+    var on = touchUI && !!a && a.tagName !== 'SELECT' && !a.readOnly && !(a.tagName === 'INPUT' && NO_KEYS.test(a.type)) && !a.closest('.sheet');
+    if (on === typing) return;
+    typing = on;
+    document.documentElement.classList.toggle('typing', on);
+    Glass.tuck(on);
+  }
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
-  document.addEventListener('focusin', function (e) { if (editing() === e.target) fitKeyboardSoon(); });
+  document.addEventListener('focusin', function (e) { if (editing() === e.target) { fitTyping(); fitKeyboardSoon(); } });
   // Clavier refermé : l'iPhone laisse parfois la page décalée, et le verre doit revenir avec elle.
+  // (petit délai : en passant d'un champ au suivant, la barre ne réapparaît pas entre les deux)
   document.addEventListener('focusout', function () {
     setTimeout(function () {
       if (!editing()) window.scrollTo(0, 0);
+      fitTyping();
       fitKeyboardSoon();
     }, 60);
   });
