@@ -965,6 +965,20 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .pills .pill.on { background: var(--thumb); box-shadow: var(--thumb-shadow); color: var(--text); }
 
 /* listes */
+.coach-btn { margin-top: 4px; }
+.coach-list { list-style: none; margin: 0; padding: 0; }
+.coach-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 9px 4px; border-top: 1px solid var(--line); font-size: 14.5px; }
+.coach-list li.g { padding: 10px 4px 2px; border-top: 0; font-size: 12.5px; font-weight: 600; color: var(--text-3); }
+.coach-list li.g + li { border-top: 0; }
+.coach-list .k { flex: 1 1 auto; min-width: 0; }
+.coach-list .v { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+.coach-list .v.long { flex-basis: 100%; text-align: left; font-size: 13.5px; }
+.coach-list .sub { flex-basis: 100%; font-size: 12.5px; color: var(--text-3); }
+.coach-more summary { cursor: pointer; list-style: none; font-size: 13px; font-weight: 600; color: var(--text-2); margin: 18px 4px 4px; }
+.coach-more summary::-webkit-details-marker { display: none; }
+.coach-more summary::after { content: ' ›'; color: var(--text-3); }
+.coach-more[open] summary::after { content: ' ⌄'; }
+.coach-more b { color: var(--warn); font-weight: 600; }
 .list { list-style: none; margin: 0; padding: 0; }
 .list-title { font-size: 13px; font-weight: 600; color: var(--text-2); margin: 18px 4px 4px; }
 .food-row, .entry, .hist-row {
@@ -1494,7 +1508,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-20 12:13 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-20 14:46 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -1547,7 +1561,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
       .catch(function () { fail(navigator.onLine === false ? 'pas de réseau' : 'le script ne répond pas (déploiement : Moi / Tout le monde, nouvelle version ; lance testerApp dans l\'éditeur)'); });
   }
 
-  var FNS = ['api_boot', 'api_sync', 'api_foodByBarcode', 'api_foodSearch', 'api_photoSave', 'api_photoGet', 'api_photoDelete', 'api_driveToken'];
+  var FNS = ['api_boot', 'api_sync', 'api_foodByBarcode', 'api_foodSearch', 'api_photoSave', 'api_photoGet', 'api_photoDelete', 'api_driveToken', 'api_coachPlan', 'api_coachSend'];
   var script = {};
   Object.defineProperty(script, 'run', {
     get: function () {
@@ -4216,6 +4230,122 @@ var Store = (function () {
 </script>
 
   <script>
+/**
+ * Bouton « Envoyer au coach » (écran Jour) : recopie dans le Sheet du coach (TRAINING, JOURNAL) ce que l'app a
+ * enregistré les 7 derniers jours. Jamais automatique : aperçu d'abord (api_coachPlan, rien n'est écrit), puis envoi
+ * des seules cases montrées (api_coachSend). Les données partent du téléphone : pas besoin d'attendre la synchro.
+ * Règles (cases vides seulement, différences montrées, semaines, noms) : server/Coach.js.
+ */
+var Coach = (function () {
+  var DAYS = 7;
+
+  function payload() {
+    var to = U.today(), from = U.addDays(to, -(DAYS - 1));
+    var since = U.addDays(to, -120); // séances des derniers mois : elles fixent les colonnes SEM
+    var inRange = function (r) { return r.date >= from && r.date <= to; };
+    var settings = Store.list('SETTINGS');
+    var planned = {};
+    for (var d = 1; d <= 7; d++) { var p = Calc.dayPlan(settings, d); if (p.session) planned[d] = p.session; }
+    return {
+      from: from, to: to, today: to, planned: planned,
+      daily: Store.list('DAILY').filter(inRange),
+      sessions: Store.list('SESSIONS').filter(function (s) { return s.date >= since && s.date <= to; })
+        .map(function (s) { return { id: s.id, date: s.date, name: s.name, durationMin: s.durationMin, rpe: s.rpe, perf: s.perf, note: s.note }; }),
+      sets: Store.list('SETS').filter(inRange)
+        .map(function (s) { return { id: s.id, date: s.date, sessionId: s.sessionId, session: s.session, exercise: s.exercise, setNo: s.setNo, reps: s.reps, load: s.load }; }),
+      program: Store.list('PROGRAM').map(function (p) { return { session: p.session, dow: p.dow }; })
+    };
+  }
+
+  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+
+  /** Une ligne : libellé à gauche, valeur à droite, précision dessous (raison, valeur du coach). */
+  function row(name, value, sub) {
+    var long = String(value || '').length > 28; // commentaire : sous le libellé, pas aligné à droite
+    return '<li><span class="k">' + U.esc(name) + '</span><span class="v' + (long ? ' long' : '') + '">' + U.esc(value || '') + '</span>' +
+      (sub ? '<span class="sub">' + sub + '</span>' : '') + '</li>';
+  }
+
+  /** Items du plan regroupés par jour, puis par séance (« Haut A · SEM 5 »). */
+  function byDay(items, line) {
+    var days = {}, order = [];
+    items.forEach(function (it) {
+      if (!days[it.date]) { days[it.date] = []; order.push(it.date); }
+      days[it.date].push(it);
+    });
+    return order.sort().map(function (date) {
+      var html = '', group = null;
+      days[date].forEach(function (it) {
+        var g = it.kind === 'journal' ? 'Journal' : (it.group || 'Training');
+        if (g !== group) { html += '<li class="g">' + U.esc(g) + '</li>'; group = g; }
+        html += line(it);
+      });
+      return '<div class="list-title">' + U.esc(U.longDate(date)) + '</div><ul class="coach-list">' + html + '</ul>';
+    }).join('');
+  }
+
+  function planHtml(plan) {
+    var items = plan.items || [];
+    var write = items.filter(function (it) { return it.status === 'write'; });
+    var diff = items.filter(function (it) { return it.status === 'diff'; });
+    var skip = items.filter(function (it) { return it.status === 'skip'; });
+    var same = items.filter(function (it) { return it.status === 'same'; }).length;
+    var html = '<p class="muted small">7 derniers jours (' + U.esc(U.shortDate(plan.from)) + ' – ' + U.esc(U.shortDate(plan.to)) +
+      '). Seules les cases vides du Sheet du coach sont remplies : rien de ce qui y est déjà n\'est modifié.</p>';
+    html += write.length
+      ? byDay(write, function (it) { return row(it.label, it.value); })
+      : '<p>Rien de nouveau à envoyer : tout est déjà dans le Sheet du coach.</p>';
+    if (skip.length) {
+      html += '<details class="coach-more"' + (write.length ? '' : ' open') + '><summary>Pas envoyé (' + skip.length + ')</summary>' +
+        byDay(skip, function (it) { return row(it.label, it.value, U.esc(it.why)); }) + '</details>';
+    }
+    if (diff.length) {
+      html += '<details class="coach-more"><summary>Différent chez le coach, pas touché (' + diff.length + ')</summary>' +
+        byDay(diff, function (it) { return row(it.label, it.value, 'Chez le coach : <b>' + U.esc(it.coach) + '</b>'); }) + '</details>';
+    }
+    if (same) html += '<p class="muted small">' + plural(same, 'ligne déjà identique', 'lignes déjà identiques') + ' chez le coach.</p>';
+    html += plan.cells
+      ? '<button class="btn primary block" data-coach-send>Envoyer ' + plural(plan.cells, 'case', 'cases') + '</button>'
+      : '<button class="btn secondary block" data-close-sheet>Fermer</button>';
+    return html;
+  }
+
+  function fail(app, err) {
+    app.openSheet({ title: 'Envoyer au coach', html: '<p>L\'envoi n\'a pas pu se faire.</p><p class="muted small">' + U.esc(String(err && err.message || err)) + '</p>' +
+      '<button class="btn secondary block" data-close-sheet>Fermer</button>' });
+  }
+
+  function open(app) {
+    var body = payload();
+    app.openSheet({ title: 'Envoyer au coach', html: '<p class="muted">Lecture du Sheet du coach…</p>' });
+    U.server('api_coachPlan', JSON.stringify(body)).then(function (json) {
+      var plan = JSON.parse(json);
+      app.openSheet({
+        title: 'Envoyer au coach',
+        html: planHtml(plan),
+        bind: function (sh) {
+          var btn = sh.querySelector('[data-coach-send]');
+          if (!btn) return;
+          btn.addEventListener('click', function () {
+            btn.disabled = true;
+            btn.textContent = 'Envoi…';
+            U.server('api_coachSend', JSON.stringify(Object.assign({}, body, { keys: plan.keys }))).then(function (res) {
+              var r = JSON.parse(res);
+              app.closeSheet();
+              app.toast(r.written ? plural(r.written, 'case envoyée', 'cases envoyées') + ' au coach' : 'Rien d\'envoyé : le Sheet du coach a changé entre-temps');
+              app.haptic();
+            }, function (e) { fail(app, e); });
+          });
+        }
+      });
+    }, function (e) { fail(app, e); });
+  }
+
+  return { open: open, payload: payload, planHtml: planHtml };
+})();
+</script>
+
+  <script>
 /*
  * Écran « Aujourd'hui » : résumé du jour, séance prévue, check-in du matin et du soir.
  * Les saisies sont enregistrées au fil de l'eau (Store.put) sans recharger l'écran,
@@ -4323,7 +4453,9 @@ Views.today = (function () {
       '<label class="field"><span class="field-label">Note du jour</span>' +
       '<textarea data-field="note" rows="3" placeholder="Séance, digestion, ressenti…">' + U.esc(day.note || '') + '</textarea></label>' +
       '</section>';
-    return '<div id="today-summary">' + summaryHtml(date) + '</div>' + sessionCard(date) + morning + evening;
+    // Recopie des 7 derniers jours dans le Sheet du coach, après un aperçu (Coach.html) : jamais automatique.
+    var coach = '<button class="btn secondary block coach-btn" data-coach>' + App.icon('send', 'sm') + 'Envoyer au coach</button>';
+    return '<div id="today-summary">' + summaryHtml(date) + '</div>' + sessionCard(date) + morning + evening + coach;
   }
 
   function header(state) {
@@ -4334,6 +4466,7 @@ Views.today = (function () {
     root.addEventListener('click', function (e) {
       var go = e.target.closest('[data-go]');
       if (go) { app.go(go.getAttribute('data-go')); return; }
+      if (e.target.closest('[data-coach]')) { Coach.open(app); return; }
       var b = e.target.closest('[data-rate]');
       if (!b) return;
       var key = b.getAttribute('data-rate'), v = Number(b.getAttribute('data-v'));
@@ -7866,7 +7999,8 @@ window.Views = Views;
     flip: '<path d="M4 9.5A2.5 2.5 0 0 1 6.5 7H8l1.5-2h5L16 7h1.5A2.5 2.5 0 0 1 20 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-7Z"/><path d="M9.4 12.4a2.7 2.7 0 0 1 4.8-1.3M14.6 14.1a2.7 2.7 0 0 1-4.8 1.3M14.4 9.6v1.7h-1.7M9.6 17.1v-1.7h1.7"/>',
     star: '<path d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6-5-2.6-5 2.6.9-5.6-4-3.9 5.6-.8L12 3.8Z"/>',
     trash: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7"/>',
-    flame: '<path d="M12 21c-3.6 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.7 2.3 3.3.2-2.9 1.6-5.5 3.6-7 .2 2.6 1.4 4.3 2.6 6 .8 1.2 1.4 2.5 1.4 4.3 0 4-2.9 7.2-7 7.2Z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.4-2.6 2.1-4 .9.9 2.1 1.8 2.9 3 .3.4.5.9.5 1.4 0 1.3-1.2 2.4-2.7 2.4Z"/>'
+    flame: '<path d="M12 21c-3.6 0-6.5-2.6-6.5-6.2 0-3.3 2.3-5.3 3.6-7.6.4 1.6 1.2 2.7 2.3 3.3.2-2.9 1.6-5.5 3.6-7 .2 2.6 1.4 4.3 2.6 6 .8 1.2 1.4 2.5 1.4 4.3 0 4-2.9 7.2-7 7.2Z"/><path d="M12 21c-1.6 0-2.8-1.2-2.8-2.8 0-1.7 1.4-2.6 2.1-4 .9.9 2.1 1.8 2.9 3 .3.4.5.9.5 1.4 0 1.3-1.2 2.4-2.7 2.4Z"/>',
+    send: '<path d="M20.5 3.5 10 14"/><path d="M20.5 3.5 14 20.5l-4-6.5-6.5-4 17-6.5Z"/>'
   };
   function icon(name, cls) {
     return '<svg class="icon ' + (cls || '') + '" viewBox="0 0 24 24" aria-hidden="true">' + (PATHS[name] || '') + '</svg>';
