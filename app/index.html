@@ -1512,7 +1512,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-20 15:07 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-20 23:16 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -2656,10 +2656,9 @@ var U = (function () {
  * Ce qui compte n'est pas la valeur absolue mais l'écart à ta moyenne des 14 jours précédents.
  */
 var Calc = (function () {
+  // Notes de 1 à 5, comme dans le journal du coach (énergie et courbatures retirées le 21/11/2026).
   var RATINGS = [
     { key: 'sleepQ', label: 'Qualité du sommeil', low: 'Très mauvaise', high: 'Excellente', score: true },
-    { key: 'energy', label: 'Énergie', low: 'Épuisé', high: 'Au top', score: true },
-    { key: 'soreness', label: 'Courbatures', low: 'Aucune', high: 'Très fortes', score: true, invert: true },
     { key: 'stress', label: 'Stress', low: 'Aucun', high: 'Très élevé', score: true, invert: true },
     { key: 'mood', label: 'Moral', low: 'Au plus bas', high: 'Excellent', score: true }
   ];
@@ -2669,18 +2668,21 @@ var Calc = (function () {
   function mean(a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; }
   function round(v, d) { var k = Math.pow(10, d || 0); return v === null ? null : Math.round(v * k) / k; }
 
-  /** Score sur 25, ou null si moins de 3 items remplis (les items manquants sont estimés à la moyenne des autres). */
+  /**
+   * Score sur 25 (notes de 1 à 5 : tout à 1 = 0, tout à 5 = 25), ou null si moins de 2 items remplis.
+   * Un ancien 0 compte comme 1.
+   */
   function readiness(day) {
     if (!day) return null;
     var vals = [];
     RATINGS.forEach(function (r) {
       var v = day[r.key];
       if (!isNum(v)) return;
-      v = Math.max(0, Math.min(5, v));
-      vals.push(r.invert ? 5 - v : v);
+      v = Math.max(1, Math.min(5, v));
+      vals.push(r.invert ? 6 - v : v);
     });
-    if (vals.length < 3) return null;
-    return round(mean(vals) * 5, 1);
+    if (vals.length < 2) return null;
+    return round((mean(vals) - 1) * 25 / 4, 1);
   }
 
   /** Index date → enregistrement. */
@@ -4409,18 +4411,21 @@ Views.today = (function () {
   function save(date, patch) {
     var rec = Object.assign({}, dayRecord(date), patch);
     Object.keys(patch).forEach(function (k) { if (patch[k] === null || patch[k] === '') rec[k] = null; });
+    // Copie du téléphone d'avant le 21/11 : énergie et courbatures retirées, notes de 1 à 5.
+    delete rec.energy; delete rec.soreness;
+    Calc.RATINGS.concat([Calc.HUNGER]).forEach(function (r) { if (rec[r.key] === 0) rec[r.key] = 1; });
     Store.put('DAILY', rec);
   }
 
   function ratingRow(r, value) {
     var btns = '';
-    for (var i = 0; i <= 5; i++) {
+    for (var i = 1; i <= 5; i++) {
       btns += '<button type="button" data-rate="' + r.key + '" data-v="' + i + '" aria-pressed="' + (value === i) + '">' + i + '</button>';
     }
     return '<div class="rating">' +
       '<div class="rating-head"><span>' + U.esc(r.label) + '</span></div>' +
       '<div class="seg scale" role="group" aria-label="' + U.esc(r.label) + '">' + btns + '</div>' +
-      '<div class="rating-scale"><span>0 · ' + U.esc(r.low) + '</span><span>' + U.esc(r.high) + ' · 5</span></div>' +
+      '<div class="rating-scale"><span>1 · ' + U.esc(r.low) + '</span><span>' + U.esc(r.high) + ' · 5</span></div>' +
       '</div>';
   }
 
