@@ -973,6 +973,10 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
 .coach-list .k { flex: 1 1 auto; min-width: 0; }
 .coach-list .v { color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
 .coach-list .v.long { flex-basis: 100%; text-align: left; font-size: 13.5px; }
+.coach-asks h3, .coach-h { margin: 16px 0 2px; font-size: 16px; }
+.coach-h { margin-top: 22px; }
+.coach-list li.ask { flex-direction: column; align-items: stretch; gap: 8px; }
+.coach-list li.ask .seg { width: 100%; }
 .coach-list .sub { flex-basis: 100%; font-size: 12.5px; color: var(--text-3); }
 .coach-more summary { cursor: pointer; list-style: none; font-size: 13px; font-weight: 600; color: var(--text-2); margin: 18px 4px 4px; }
 .coach-more summary::-webkit-details-marker { display: none; }
@@ -1508,7 +1512,7 @@ table.data td.diet-cell .icon { width: 15px; height: 15px; stroke-width: 2.4; ve
 @media (max-width: 360px) { .tiles { grid-template-columns: 1fr 1fr; } .swatches { grid-template-columns: repeat(4, 1fr); } }
 </style>
 
-<script>window.GRIND_BUILD = "2026-11-20 14:46 UTC";</script>
+<script>window.GRIND_BUILD = "2026-11-20 15:07 UTC";</script>
 </head>
 <body>
   <div id="app">
@@ -4284,17 +4288,35 @@ var Coach = (function () {
     }).join('');
   }
 
+  /** Question de l'aperçu (case vide chez le coach que l'app ne sait pas remplir) : un choix, rien = laissé vide. */
+  function askRow(it) {
+    var opts = it.ask.options || [];
+    if (!opts.length) for (var v = it.ask.min; v <= it.ask.max; v++) opts.push(String(v));
+    return '<li class="ask"><span class="k">' + U.esc(it.label) + '</span>' +
+      '<div class="seg scale' + (opts.length > 6 ? ' s11' : '') + '" role="group" aria-label="' + U.esc(it.label) + '" data-ask="' + U.esc(it.key) + '">' +
+      opts.map(function (o) { return '<button type="button" data-v="' + U.esc(o) + '" aria-pressed="false">' + U.esc(o) + '</button>'; }).join('') +
+      '</div></li>';
+  }
+
+  function sendLabel(n) { return n ? 'Envoyer ' + plural(n, 'case', 'cases') : 'Réponds à une question pour envoyer'; }
+
   function planHtml(plan) {
     var items = plan.items || [];
+    var asks = items.filter(function (it) { return it.status === 'ask'; });
     var write = items.filter(function (it) { return it.status === 'write'; });
     var diff = items.filter(function (it) { return it.status === 'diff'; });
     var skip = items.filter(function (it) { return it.status === 'skip'; });
     var same = items.filter(function (it) { return it.status === 'same'; }).length;
     var html = '<p class="muted small">7 derniers jours (' + U.esc(U.shortDate(plan.from)) + ' – ' + U.esc(U.shortDate(plan.to)) +
       '). Seules les cases vides du Sheet du coach sont remplies : rien de ce qui y est déjà n\'est modifié.</p>';
+    if (asks.length) {
+      html += '<div class="coach-asks"><h3>À compléter</h3><p class="muted small">Ce que l\'app ne note pas. Sans réponse, la case reste vide chez le coach.</p>' +
+        byDay(asks, askRow) + '</div>';
+    }
+    if (asks.length && write.length) html += '<h3 class="coach-h">À envoyer</h3>';
     html += write.length
       ? byDay(write, function (it) { return row(it.label, it.value); })
-      : '<p>Rien de nouveau à envoyer : tout est déjà dans le Sheet du coach.</p>';
+      : (asks.length ? '' : '<p>Rien de nouveau à envoyer : tout est déjà dans le Sheet du coach.</p>');
     if (skip.length) {
       html += '<details class="coach-more"' + (write.length ? '' : ' open') + '><summary>Pas envoyé (' + skip.length + ')</summary>' +
         byDay(skip, function (it) { return row(it.label, it.value, U.esc(it.why)); }) + '</details>';
@@ -4304,8 +4326,8 @@ var Coach = (function () {
         byDay(diff, function (it) { return row(it.label, it.value, 'Chez le coach : <b>' + U.esc(it.coach) + '</b>'); }) + '</details>';
     }
     if (same) html += '<p class="muted small">' + plural(same, 'ligne déjà identique', 'lignes déjà identiques') + ' chez le coach.</p>';
-    html += plan.cells
-      ? '<button class="btn primary block" data-coach-send>Envoyer ' + plural(plan.cells, 'case', 'cases') + '</button>'
+    html += plan.cells || asks.length
+      ? '<button class="btn primary block" data-coach-send' + (plan.cells ? '' : ' disabled') + '>' + sendLabel(plan.cells) + '</button>'
       : '<button class="btn secondary block" data-close-sheet>Fermer</button>';
     return html;
   }
@@ -4313,6 +4335,17 @@ var Coach = (function () {
   function fail(app, err) {
     app.openSheet({ title: 'Envoyer au coach', html: '<p>L\'envoi n\'a pas pu se faire.</p><p class="muted small">' + U.esc(String(err && err.message || err)) + '</p>' +
       '<button class="btn secondary block" data-close-sheet>Fermer</button>' });
+  }
+
+  /** Réponses que l'app sait garder (Perf, note /10 de la séance) : enregistrées aussi dans l'app. */
+  function keep(plan, answers) {
+    (plan.items || []).forEach(function (it) {
+      if (it.status !== 'ask' || !it.field || answers[it.key] == null) return;
+      var rec = Store.get(it.field.t, it.field.id);
+      if (!rec || (rec[it.field.key] != null && rec[it.field.key] !== '')) return; // déjà noté dans l'app
+      var patch = {}; patch[it.field.key] = Number(answers[it.key]);
+      Store.put(it.field.t, Object.assign({}, rec, patch));
+    });
   }
 
   function open(app) {
@@ -4326,11 +4359,25 @@ var Coach = (function () {
         bind: function (sh) {
           var btn = sh.querySelector('[data-coach-send]');
           if (!btn) return;
+          var answers = {};
+          var count = function () { return plan.cells + Object.keys(answers).length; };
+          // Un toucher choisit, un second toucher sur le même choix l'efface.
+          sh.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-ask] button');
+            if (!b) return;
+            var seg = b.parentNode, key = seg.getAttribute('data-ask'), v = b.getAttribute('data-v');
+            if (answers[key] === v) delete answers[key]; else answers[key] = v;
+            seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', answers[key] === x.getAttribute('data-v')); });
+            btn.disabled = !count();
+            btn.textContent = sendLabel(count());
+            app.haptic();
+          });
           btn.addEventListener('click', function () {
             btn.disabled = true;
             btn.textContent = 'Envoi…';
-            U.server('api_coachSend', JSON.stringify(Object.assign({}, body, { keys: plan.keys }))).then(function (res) {
+            U.server('api_coachSend', JSON.stringify(Object.assign({}, body, { keys: plan.keys, answers: answers }))).then(function (res) {
               var r = JSON.parse(res);
+              keep(plan, answers);
               app.closeSheet();
               app.toast(r.written ? plural(r.written, 'case envoyée', 'cases envoyées') + ' au coach' : 'Rien d\'envoyé : le Sheet du coach a changé entre-temps');
               app.haptic();
